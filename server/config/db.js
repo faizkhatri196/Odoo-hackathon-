@@ -19,15 +19,15 @@ const connectDB = async () => {
 
   try {
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 15000,
+      serverSelectionTimeoutMS: 5000,
       autoIndex: true,
     });
     console.log(`✅ MongoDB Connected to host: ${conn.connection.host}`);
     return conn;
   } catch (error) {
-    // Safe logging without credentials
-    console.error(`❌ Database Connection Error: ${error.message}`);
-    process.exit(1);
+    // Safe logging without crashing dev server
+    console.warn(`⚠️ Database Connection Warning: ${error.message}. Running backend in disconnected mode.`);
+    return null;
   }
 };
 
