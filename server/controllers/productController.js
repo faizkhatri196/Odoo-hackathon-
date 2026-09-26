@@ -41,10 +41,11 @@ exports.getProducts = async (req, res, next) => {
       query['warehouseStock.warehouse'] = wId;
     }
 
+    const isLowStock = req.query.lowStock === 'true' || req.query.lowStock === true;
     const statusFilter = (stockStatus || status || '').toUpperCase();
     if (statusFilter === 'OUT_OF_STOCK') {
       query.totalQuantity = { $lte: 0 };
-    } else if (statusFilter === 'LOW_STOCK') {
+    } else if (statusFilter === 'LOW_STOCK' || isLowStock) {
       query.$expr = {
         $and: [
           { $gt: ['$totalQuantity', 0] },
@@ -366,3 +367,21 @@ exports.getProductLedger = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Get distinct product categories
+ * GET /api/products/categories
+ */
+exports.getProductCategories = async (req, res, next) => {
+  try {
+    const categories = await Product.distinct('category', { isActive: true });
+    const formatted = categories.filter(Boolean).map((cat) => ({ name: cat }));
+    res.json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
