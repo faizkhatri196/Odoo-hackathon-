@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { transferService } from '../../services/transferService';
 import { productService } from '../../services/productService';
-import api from '../../services/api';
+import { dashboardService } from '../../services/dashboardService';
 
 export const TransferForm = () => {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ export const TransferForm = () => {
   const [products, setProducts] = useState([]);
   const [fromWarehouse, setFromWarehouse] = useState('');
   const [toWarehouse, setToWarehouse] = useState('');
-  const [items, setItems] = useState([{ product: '', quantity: 30 }]);
+  const [items, setItems] = useState([{ product: '', quantity: 10 }]);
   const [notes, setNotes] = useState('Relocate inventory to secondary facility');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -20,24 +20,24 @@ export const TransferForm = () => {
     const fetchData = async () => {
       try {
         const [whRes, prodRes] = await Promise.all([
-          api.get('/warehouses'),
-          productService.getProducts(),
+          dashboardService.getWarehouses(),
+          productService.getProducts().catch(() => ({ data: [] })),
         ]);
-        const whs = whRes.data.data || whRes.data || [];
+        const whs = whRes.data || [];
         setWarehouses(whs);
         if (whs.length > 0) {
-          setFromWarehouse(whs[0]._id);
+          setFromWarehouse(whs[0]._id || whs[0].id);
           if (whs.length > 1) {
-            setToWarehouse(whs[1]._id);
+            setToWarehouse(whs[1]._id || whs[1].id);
           } else {
-            setToWarehouse(whs[0]._id);
+            setToWarehouse(whs[0]._id || whs[0].id);
           }
         }
 
-        const prods = prodRes.data || [];
+        const prods = Array.isArray(prodRes.data) ? prodRes.data : [];
         setProducts(prods);
         if (prods.length > 0) {
-          setItems([{ product: prods[0]._id, quantity: 30 }]);
+          setItems([{ product: prods[0]._id, quantity: 10 }]);
         }
       } catch (err) {
         console.error('Failed to load warehouses/products', err);
@@ -68,6 +68,12 @@ export const TransferForm = () => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg('');
+
+    if (!fromWarehouse || !toWarehouse) {
+      setErrorMsg('Please select both source and destination warehouses.');
+      setLoading(false);
+      return;
+    }
 
     if (fromWarehouse === toWarehouse) {
       setErrorMsg('Source and destination warehouses cannot be the same facility');
@@ -100,6 +106,11 @@ export const TransferForm = () => {
       <PageHeader
         title="New Inter-Warehouse Transfer"
         description="Relocate inventory units between logistics hubs with zero loss."
+        actions={
+          <button type="button" className="btn-secondary" onClick={() => navigate('/transfers')}>
+            Back to Transfers
+          </button>
+        }
       />
 
       <form onSubmit={handleSubmit} className="glass-panel" style={{ padding: '24px', maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -109,16 +120,16 @@ export const TransferForm = () => {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px' }}>Source Warehouse (FROM) *</label>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>Source Warehouse (FROM) *</label>
             <select
               value={fromWarehouse}
               onChange={(e) => setFromWarehouse(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'rgba(30, 41, 59, 0.9)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff' }}
+              style={{ width: '100%', padding: '10px 14px', background: 'rgba(30, 41, 59, 0.9)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff' }}
             >
               {warehouses.map((w) => (
-                <option key={w._id} value={w._id}>
+                <option key={w._id || w.id} value={w._id || w.id}>
                   {w.name} ({w.code})
                 </option>
               ))}
@@ -126,14 +137,14 @@ export const TransferForm = () => {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px' }}>Destination Warehouse (TO) *</label>
+            <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>Destination Warehouse (TO) *</label>
             <select
               value={toWarehouse}
               onChange={(e) => setToWarehouse(e.target.value)}
-              style={{ width: '100%', padding: '10px', background: 'rgba(30, 41, 59, 0.9)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff' }}
+              style={{ width: '100%', padding: '10px 14px', background: 'rgba(30, 41, 59, 0.9)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff' }}
             >
               {warehouses.map((w) => (
-                <option key={w._id} value={w._id}>
+                <option key={w._id || w.id} value={w._id || w.id}>
                   {w.name} ({w.code})
                 </option>
               ))}
@@ -145,7 +156,7 @@ export const TransferForm = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <label style={{ fontSize: '0.9rem', fontWeight: 600, color: '#93c5fd' }}>Transfer Items</label>
             <button type="button" onClick={addItemRow} className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-              + Add Item
+              + Add Line Item
             </button>
           </div>
 
@@ -160,7 +171,7 @@ export const TransferForm = () => {
                 <option value="">-- Select Product --</option>
                 {products.map((p) => (
                   <option key={p._id} value={p._id}>
-                    {p.name} ({p.sku}) — Available: {p.totalQuantity}
+                    {p.name} ({p.sku}) — Available: {p.totalQuantity || 0}
                   </option>
                 ))}
               </select>
@@ -189,11 +200,11 @@ export const TransferForm = () => {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px' }}>Transfer Notes / Internal Memo</label>
+          <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-muted)' }}>Transfer Notes / Internal Memo</label>
           <input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff' }}
+            style={{ width: '100%', padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: '#fff' }}
           />
         </div>
 

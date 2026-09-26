@@ -6,14 +6,39 @@ export const dashboardService = {
     return data;
   },
 
+  getSummary: async () => {
+    const { data } = await api.get('/dashboard/summary');
+    return data;
+  },
+
   getLowStockItems: async () => {
     try {
-      const { data } = await api.get('/products', { params: { lowStock: true, limit: 10 } });
+      const { data } = await api.get('/dashboard/low-stock');
       return data;
-    } catch (err) {
-      console.warn('Backend lowStock query fallback', err);
-      return { success: false, data: [] };
+    } catch {
+      try {
+        const { data } = await api.get('/products', { params: { lowStock: true, limit: 10 } });
+        return data;
+      } catch (err) {
+        console.warn('Backend lowStock query fallback', err);
+        return { success: false, data: [] };
+      }
     }
+  },
+
+  getPendingReceipts: async () => {
+    const { data } = await api.get('/dashboard/pending-receipts');
+    return data;
+  },
+
+  getPendingDeliveries: async () => {
+    const { data } = await api.get('/dashboard/pending-deliveries');
+    return data;
+  },
+
+  getTransfers: async () => {
+    const { data } = await api.get('/dashboard/transfers');
+    return data;
   },
 
   getWarehouses: async () => {

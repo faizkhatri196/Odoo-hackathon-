@@ -20,6 +20,7 @@ export const TransferDetails = () => {
       setTransfer(res.data);
     } catch (err) {
       console.error(err);
+      setErrorMsg(err.response?.data?.message || 'Failed to load transfer');
     } finally {
       setLoading(false);
     }
@@ -45,14 +46,16 @@ export const TransferDetails = () => {
   if (loading) return <Loading text="Loading transfer..." />;
   if (!transfer) return <div>Transfer record not found.</div>;
 
+  const isCompleted = transfer.status === 'done' || transfer.status === 'DONE';
+
   return (
     <div>
       <PageHeader
         title={`Transfer ${transfer.transferNumber}`}
-        description={`From: ${transfer.fromWarehouse?.name} ➡️ To: ${transfer.toWarehouse?.name}`}
+        description={`From: ${transfer.fromWarehouse?.name || 'WH-Source'} ➡️ To: ${transfer.toWarehouse?.name || 'WH-Dest'}`}
         actions={
           <div style={{ display: 'flex', gap: '12px' }}>
-            {transfer.status !== 'done' && (
+            {!isCompleted && transfer.status !== 'canceled' && (
               <button className="btn-primary" onClick={handleValidate} disabled={validating}>
                 {validating ? 'Processing...' : 'Validate & Execute Transfer'}
               </button>
@@ -76,11 +79,11 @@ export const TransferDetails = () => {
           </div>
           <div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Source Facility</span>
-            <div style={{ marginTop: '4px', fontWeight: 600 }}>{transfer.fromWarehouse?.name} ({transfer.fromWarehouse?.code})</div>
+            <div style={{ marginTop: '4px', fontWeight: 600 }}>{transfer.fromWarehouse?.name || 'WH-Source'} ({transfer.fromWarehouse?.code || 'SRC'})</div>
           </div>
           <div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Destination Facility</span>
-            <div style={{ marginTop: '4px', fontWeight: 600 }}>{transfer.toWarehouse?.name} ({transfer.toWarehouse?.code})</div>
+            <div style={{ marginTop: '4px', fontWeight: 600 }}>{transfer.toWarehouse?.name || 'WH-Dest'} ({transfer.toWarehouse?.code || 'DEST'})</div>
           </div>
           <div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Initiated At</span>
@@ -88,27 +91,38 @@ export const TransferDetails = () => {
           </div>
         </div>
 
+        {transfer.notes && (
+          <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)', fontSize: '0.875rem' }}>
+            <span style={{ color: 'var(--text-muted)' }}>Notes: </span>
+            {transfer.notes}
+          </div>
+        )}
+
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px', color: '#93c5fd' }}>Transfer Items</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              <th style={{ padding: '8px 12px' }}>Product</th>
-              <th style={{ padding: '8px 12px' }}>SKU</th>
-              <th style={{ padding: '8px 12px' }}>Quantity Transferred</th>
-              <th style={{ padding: '8px 12px' }}>Unit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(transfer.items || []).map((it, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{it.product?.name || 'Product'}</td>
-                <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{it.product?.sku || '-'}</td>
-                <td style={{ padding: '10px 12px', fontWeight: 700, color: '#38bdf8' }}>{it.quantity}</td>
-                <td style={{ padding: '10px 12px' }}>{it.product?.unitOfMeasure || 'pcs'}</td>
+        {(!transfer.items || transfer.items.length === 0) ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No transfer line items recorded.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <th style={{ padding: '8px 12px' }}>Product</th>
+                <th style={{ padding: '8px 12px' }}>SKU</th>
+                <th style={{ padding: '8px 12px' }}>Quantity Transferred</th>
+                <th style={{ padding: '8px 12px' }}>Unit</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {transfer.items.map((it, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>{it.product?.name || (typeof it.product === 'string' ? it.product : 'Product')}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{it.product?.sku || '-'}</td>
+                  <td style={{ padding: '10px 12px', fontWeight: 700, color: '#38bdf8' }}>{it.quantity}</td>
+                  <td style={{ padding: '10px 12px' }}>{it.product?.unitOfMeasure || 'pcs'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

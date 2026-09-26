@@ -13,6 +13,10 @@ export const receiptService = {
     const { data } = await api.post('/receipts', receiptData);
     return data;
   },
+  updateReceipt: async (id, receiptData) => {
+    const { data } = await api.put(`/receipts/${id}`, receiptData);
+    return data;
+  },
   validateReceipt: async (id) => {
     const { data } = await api.post(`/receipts/${id}/validate`);
     return data;

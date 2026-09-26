@@ -13,6 +13,10 @@ export const deliveryService = {
     const { data } = await api.post('/deliveries', deliveryData);
     return data;
   },
+  updateDelivery: async (id, deliveryData) => {
+    const { data } = await api.put(`/deliveries/${id}`, deliveryData);
+    return data;
+  },
   validateDelivery: async (id) => {
     const { data } = await api.post(`/deliveries/${id}/validate`);
     return data;

@@ -13,6 +13,10 @@ export const transferService = {
     const { data } = await api.post('/transfers', transferData);
     return data;
   },
+  updateTransfer: async (id, transferData) => {
+    const { data } = await api.put(`/transfers/${id}`, transferData);
+    return data;
+  },
   validateTransfer: async (id) => {
     const { data } = await api.post(`/transfers/${id}/validate`);
     return data;

@@ -21,6 +21,7 @@ export const ReceiptDetails = () => {
       setReceipt(res.data);
     } catch (err) {
       console.error(err);
+      setErrorMsg(err.response?.data?.message || 'Failed to load receipt details');
     } finally {
       setLoading(false);
     }
@@ -37,7 +38,7 @@ export const ReceiptDetails = () => {
       await receiptService.validateReceipt(id);
       await load();
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || 'Validation failed');
+      setErrorMsg(err.response?.data?.message || err.message || 'Validation failed');
     } finally {
       setValidating(false);
     }
@@ -46,6 +47,8 @@ export const ReceiptDetails = () => {
   if (loading) return <Loading text="Loading receipt details..." />;
   if (!receipt) return <div>Receipt not found.</div>;
 
+  const isDone = receipt.status === 'done' || receipt.status === 'DONE';
+
   return (
     <div>
       <PageHeader
@@ -53,7 +56,7 @@ export const ReceiptDetails = () => {
         description={`Supplier: ${receipt.supplier?.name || 'Supplier'} | Warehouse: ${receipt.warehouse?.name || 'Main Warehouse'}`}
         actions={
           <div style={{ display: 'flex', gap: '12px' }}>
-            {receipt.status !== 'done' && (
+            {!isDone && receipt.status !== 'canceled' && (
               <button className="btn-primary" onClick={handleValidate} disabled={validating}>
                 {validating ? 'Validating...' : 'Validate & Receive Stock'}
               </button>
@@ -81,7 +84,7 @@ export const ReceiptDetails = () => {
           </div>
           <div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Warehouse</span>
-            <div style={{ marginTop: '4px', fontWeight: 600 }}>{receipt.warehouse?.name} ({receipt.warehouse?.code})</div>
+            <div style={{ marginTop: '4px', fontWeight: 600 }}>{receipt.warehouse?.name || 'Main Warehouse'} ({receipt.warehouse?.code || 'MAIN'})</div>
           </div>
           <div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Valuation</span>
@@ -92,32 +95,36 @@ export const ReceiptDetails = () => {
         </div>
 
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px', color: '#93c5fd' }}>Inbound Line Items</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              <th style={{ padding: '8px 12px' }}>Product</th>
-              <th style={{ padding: '8px 12px' }}>SKU</th>
-              <th style={{ padding: '8px 12px' }}>Ordered</th>
-              <th style={{ padding: '8px 12px' }}>Received</th>
-              <th style={{ padding: '8px 12px' }}>Unit Cost</th>
-              <th style={{ padding: '8px 12px' }}>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(receipt.items || []).map((it, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{it.product?.name || 'Product'}</td>
-                <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{it.product?.sku || '-'}</td>
-                <td style={{ padding: '10px 12px' }}>{it.orderedQty}</td>
-                <td style={{ padding: '10px 12px', color: it.receivedQty > 0 ? '#34d399' : 'inherit' }}>
-                  {it.receivedQty || (receipt.status === 'done' ? it.orderedQty : 0)}
-                </td>
-                <td style={{ padding: '10px 12px' }}>{formatCurrency(it.unitCost || 0)}</td>
-                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatCurrency(it.subtotal || it.orderedQty * it.unitCost)}</td>
+        {(!receipt.items || receipt.items.length === 0) ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No items listed on this receipt draft.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <th style={{ padding: '8px 12px' }}>Product</th>
+                <th style={{ padding: '8px 12px' }}>SKU</th>
+                <th style={{ padding: '8px 12px' }}>Ordered</th>
+                <th style={{ padding: '8px 12px' }}>Received</th>
+                <th style={{ padding: '8px 12px' }}>Unit Cost</th>
+                <th style={{ padding: '8px 12px' }}>Subtotal</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {receipt.items.map((it, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>{it.product?.name || 'Product'}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{it.product?.sku || '-'}</td>
+                  <td style={{ padding: '10px 12px' }}>{it.orderedQty}</td>
+                  <td style={{ padding: '10px 12px', color: it.receivedQty > 0 ? '#34d399' : 'inherit' }}>
+                    {it.receivedQty || (receipt.status === 'done' ? it.orderedQty : 0)}
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>{formatCurrency(it.unitCost || 0)}</td>
+                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatCurrency(it.subtotal || it.orderedQty * it.unitCost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

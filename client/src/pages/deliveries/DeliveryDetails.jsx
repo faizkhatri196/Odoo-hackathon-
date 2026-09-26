@@ -21,6 +21,7 @@ export const DeliveryDetails = () => {
       setDelivery(res.data);
     } catch (err) {
       console.error(err);
+      setErrorMsg(err.response?.data?.message || 'Failed to load delivery details');
     } finally {
       setLoading(false);
     }
@@ -47,6 +48,8 @@ export const DeliveryDetails = () => {
   if (loading) return <Loading text="Loading delivery details..." />;
   if (!delivery) return <div>Delivery not found.</div>;
 
+  const isDone = delivery.status === 'done' || delivery.status === 'DONE';
+
   return (
     <div>
       <PageHeader
@@ -54,7 +57,7 @@ export const DeliveryDetails = () => {
         description={`Customer: ${delivery.customer?.name || 'Customer'} | Warehouse: ${delivery.warehouse?.name || 'Main Warehouse'}`}
         actions={
           <div style={{ display: 'flex', gap: '12px' }}>
-            {delivery.status !== 'done' && (
+            {!isDone && delivery.status !== 'canceled' && (
               <button className="btn-primary" onClick={handleValidate} disabled={validating}>
                 {validating ? 'Dispatching...' : 'Validate & Dispatch'}
               </button>
@@ -82,7 +85,7 @@ export const DeliveryDetails = () => {
           </div>
           <div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Dispatch Warehouse</span>
-            <div style={{ marginTop: '4px', fontWeight: 600 }}>{delivery.warehouse?.name} ({delivery.warehouse?.code})</div>
+            <div style={{ marginTop: '4px', fontWeight: 600 }}>{delivery.warehouse?.name || 'Main Warehouse'} ({delivery.warehouse?.code || 'MAIN'})</div>
           </div>
           <div>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Order Value</span>
@@ -93,32 +96,36 @@ export const DeliveryDetails = () => {
         </div>
 
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px', color: '#93c5fd' }}>Dispatched Line Items</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              <th style={{ padding: '8px 12px' }}>Product</th>
-              <th style={{ padding: '8px 12px' }}>SKU</th>
-              <th style={{ padding: '8px 12px' }}>Demanded</th>
-              <th style={{ padding: '8px 12px' }}>Delivered</th>
-              <th style={{ padding: '8px 12px' }}>Unit Price</th>
-              <th style={{ padding: '8px 12px' }}>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(delivery.items || []).map((it, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{it.product?.name || 'Product'}</td>
-                <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{it.product?.sku || '-'}</td>
-                <td style={{ padding: '10px 12px' }}>{it.demandedQty}</td>
-                <td style={{ padding: '10px 12px', color: it.deliveredQty > 0 ? '#34d399' : 'inherit' }}>
-                  {it.deliveredQty || (delivery.status === 'done' ? it.demandedQty : 0)}
-                </td>
-                <td style={{ padding: '10px 12px' }}>{formatCurrency(it.unitPrice || 0)}</td>
-                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatCurrency(it.subtotal || it.demandedQty * it.unitPrice)}</td>
+        {(!delivery.items || delivery.items.length === 0) ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No items listed on this delivery order.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <th style={{ padding: '8px 12px' }}>Product</th>
+                <th style={{ padding: '8px 12px' }}>SKU</th>
+                <th style={{ padding: '8px 12px' }}>Demanded</th>
+                <th style={{ padding: '8px 12px' }}>Delivered</th>
+                <th style={{ padding: '8px 12px' }}>Unit Price</th>
+                <th style={{ padding: '8px 12px' }}>Subtotal</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {delivery.items.map((it, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>{it.product?.name || 'Product'}</td>
+                  <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{it.product?.sku || '-'}</td>
+                  <td style={{ padding: '10px 12px' }}>{it.demandedQty}</td>
+                  <td style={{ padding: '10px 12px', color: it.deliveredQty > 0 ? '#34d399' : 'inherit' }}>
+                    {it.deliveredQty || (delivery.status === 'done' ? it.demandedQty : 0)}
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>{formatCurrency(it.unitPrice || 0)}</td>
+                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>{formatCurrency(it.subtotal || it.demandedQty * it.unitPrice)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
