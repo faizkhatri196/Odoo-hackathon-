@@ -31,10 +31,14 @@ const receiptItemSchema = new mongoose.Schema(
 
 const receiptSchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     receiptNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     supplier: {
       name: { type: String, required: true },
@@ -69,5 +73,8 @@ const receiptSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+receiptSchema.index({ company: 1, receiptNumber: 1 });
+receiptSchema.index({ company: 1, status: 1 });
 
 module.exports = mongoose.model('Receipt', receiptSchema);

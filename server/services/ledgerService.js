@@ -3,6 +3,7 @@ const StockLedger = require('../models/StockLedger');
 
 class LedgerService {
   static async getEntries({
+    company = null,
     productId = null,
     product = null,
     warehouseId = null,
@@ -20,6 +21,9 @@ class LedgerService {
     page = 1,
   }) {
     const query = {};
+    if (company) {
+      query.company = company;
+    }
 
     const prodId = productId || product;
     if (prodId && mongoose.Types.ObjectId.isValid(prodId)) {

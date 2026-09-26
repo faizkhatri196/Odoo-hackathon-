@@ -8,8 +8,18 @@ exports.getReceipts = async (req, res, next) => {
     const { status, warehouse, search } = req.query;
     const filter = {};
 
+    if (req.user?.company) {
+      filter.company = req.user.company;
+    }
+
+    // Role-specific filtering: Warehouse staff operates their assigned facility
+    if (req.user?.role === 'warehouse_staff' && req.user?.warehouse) {
+      filter.warehouse = req.user.warehouse;
+    } else if (warehouse && warehouse !== 'ALL') {
+      filter.warehouse = warehouse;
+    }
+
     if (status && status !== 'ALL') filter.status = status;
-    if (warehouse && warehouse !== 'ALL') filter.warehouse = warehouse;
     if (search) {
       filter.$or = [
         { receiptNumber: { $regex: search, $options: 'i' } },
@@ -66,7 +76,10 @@ exports.createReceipt = async (req, res, next) => {
     // Resolve warehouse: explicit body -> user assigned -> default active warehouse
     let targetWarehouse = warehouse || (req.user && req.user.warehouse);
     if (!targetWarehouse) {
-      const defaultWh = await Warehouse.findOne({ isActive: true });
+      const defaultWh = await Warehouse.findOne({
+        isActive: true,
+        ...(req.user?.company ? { company: req.user.company } : {}),
+      });
       if (defaultWh) targetWarehouse = defaultWh._id;
     }
 
@@ -90,6 +103,7 @@ exports.createReceipt = async (req, res, next) => {
     const totalAmount = formattedItems.reduce((sum, it) => sum + (it.subtotal || 0), 0);
 
     const receipt = await Receipt.create({
+      company: req.user?.company || null,
       receiptNumber,
       supplier: normalizedSupplier,
       warehouse: targetWarehouse,

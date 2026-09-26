@@ -3,6 +3,11 @@ const { TRANSACTION_TYPES } = require('../utils/constants');
 
 const stockLedgerSchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     transactionType: {
       type: String,
       enum: Object.values(TRANSACTION_TYPES),

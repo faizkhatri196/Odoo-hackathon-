@@ -20,6 +20,7 @@ exports.getLedger = async (req, res, next) => {
     } = req.query;
 
     const result = await LedgerService.getEntries({
+      company: req.user?.company,
       productId: productId || product,
       warehouseId: warehouseId || warehouse,
       locationId: locationId || location,

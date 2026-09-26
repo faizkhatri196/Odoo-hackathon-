@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronRight,
   ShieldAlert,
+  Building2,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -89,6 +91,50 @@ export const Sidebar = ({ isOpen, onClose }) => {
         className={`sidebar-container ${isOpen ? 'mobile-open' : ''}`}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+          {/* Company Mini Badge */}
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(99, 102, 241, 0.08)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              marginBottom: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+              <Building2 size={15} color="#818cf8" />
+              <span
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  color: '#fff',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {user?.company?.name || user?.companyName || 'StockSense Logistics'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.7rem', color: '#818cf8', fontWeight: 600 }}>
+                {user?.company?.code ? `CODE: ${user.company.code}` : 'TENANT WORKSPACE'}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.65rem',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#34d399',
+                  fontWeight: 600,
+                }}
+              >
+                ACTIVE
+              </span>
+            </div>
+          </div>
+
           {/* Main Dashboard */}
           <NavLink to="/" end style={activeLinkStyle} onClick={onClose}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -208,6 +254,33 @@ export const Sidebar = ({ isOpen, onClose }) => {
                       <span>Warehouse Facilities</span>
                     </div>
                   </NavLink>
+
+                  <a
+                    href="/#team-management"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '9px 14px',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: 'var(--text-muted)',
+                      textDecoration: 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onClick={(e) => {
+                      onClose();
+                      const el = document.getElementById('team-management');
+                      if (el) {
+                        e.preventDefault();
+                        el.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                  >
+                    <Users size={16} color="#a78bfa" />
+                    <span>Team & Workforce</span>
+                  </a>
                 </div>
               )}
             </div>

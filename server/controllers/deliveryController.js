@@ -8,9 +8,13 @@ exports.getDeliveries = async (req, res, next) => {
   try {
     const { status, warehouse, search } = req.query;
     const filter = {};
+    if (req.user?.company) filter.company = req.user.company;
 
-    if (status && status !== 'ALL') filter.status = status;
-    if (warehouse && warehouse !== 'ALL') filter.warehouse = warehouse;
+    if (req.user?.role === 'warehouse_staff' && req.user?.warehouse) {
+      filter.warehouse = req.user.warehouse;
+    } else if (warehouse && warehouse !== 'ALL') {
+      filter.warehouse = warehouse;
+    }
     if (search) {
       filter.$or = [
         { deliveryNumber: { $regex: search, $options: 'i' } },
@@ -89,6 +93,7 @@ exports.createDelivery = async (req, res, next) => {
     const totalAmount = formattedItems.reduce((sum, it) => sum + (it.subtotal || 0), 0);
 
     const delivery = await Delivery.create({
+      company: req.user?.company || null,
       deliveryNumber,
       customer: normalizedCustomer,
       warehouse: targetWarehouse,

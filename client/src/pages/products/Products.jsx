@@ -6,6 +6,7 @@ import { SearchBar } from '../../components/SearchBar';
 import { Loading } from '../../components/Loading';
 import { productService } from '../../services/productService';
 import { formatCurrency } from '../../utils/formatNumber';
+import { useAuth } from '../../hooks/useAuth';
 
 export const Products = () => {
   const [products, setProducts] = useState([]);
@@ -42,15 +43,19 @@ export const Products = () => {
     )},
   ];
 
+  const { user } = useAuth();
+
   return (
     <div>
       <PageHeader
         title="Products & Inventory Master"
         description="Manage product catalogs, SKUs, pricing and multi-warehouse stock levels."
         actions={
-          <button className="btn-primary" onClick={() => navigate('/products/new')}>
-            + Add Product
-          </button>
+          (user?.role === 'admin' || user?.role === 'inventory_manager') && (
+            <button className="btn-primary" onClick={() => navigate('/products/new')}>
+              + Add Product
+            </button>
+          )
         }
       />
 

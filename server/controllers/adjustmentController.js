@@ -6,7 +6,9 @@ const { DOCUMENT_STATUS, TRANSACTION_TYPES } = require('../utils/constants');
 
 exports.getAdjustments = async (req, res, next) => {
   try {
-    const adjustments = await Adjustment.find()
+    const filter = {};
+    if (req.user?.company) filter.company = req.user.company;
+    const adjustments = await Adjustment.find(filter)
       .populate('warehouse', 'name code')
       .populate('items.product', 'name sku unitOfMeasure')
       .sort({ createdAt: -1 });
@@ -75,6 +77,7 @@ exports.createAdjustment = async (req, res, next) => {
     }
 
     const adjustment = await Adjustment.create({
+      company: req.user?.company || null,
       adjustmentNumber,
       warehouse: targetWarehouse,
       items: formattedItems,

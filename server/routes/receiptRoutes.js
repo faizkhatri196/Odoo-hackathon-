@@ -8,7 +8,7 @@ const {
   updateReceipt,
   validateReceipt,
 } = require('../controllers/receiptController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/validationMiddleware');
 
 const createReceiptRules = [
@@ -17,10 +17,15 @@ const createReceiptRules = [
 ];
 
 router.use(protect);
-router.route('/').get(getReceipts).post(createReceiptRules, createReceipt);
-router.route('/:id').get(getReceiptById).put(updateReceipt);
+router.route('/')
+  .get(getReceipts)
+  .post(authorize('admin', 'inventory_manager'), createReceiptRules, createReceipt);
+
+router.route('/:id')
+  .get(getReceiptById)
+  .put(authorize('admin', 'inventory_manager'), updateReceipt);
+
+// Staff can inspect & validate/verify stock into inventory
 router.post('/:id/validate', validateReceipt);
 
 module.exports = router;
-
-

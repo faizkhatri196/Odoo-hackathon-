@@ -7,29 +7,35 @@ import { formatDate } from '../../../utils/formatDate';
 import { receiptService } from '../../../services/receiptService';
 import { deliveryService } from '../../../services/deliveryService';
 import { transferService } from '../../../services/transferService';
+import { useAuth } from '../../../hooks/useAuth';
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Repeat,
   CheckCircle,
-  Plus,
-  ArrowRight,
   Truck,
   PackageCheck,
+  ShieldCheck,
+  Building2,
+  Package,
+  AlertCircle,
 } from 'lucide-react';
 
 export const StaffDashboardView = ({
   receipts = [],
   deliveries = [],
   transfers = [],
+  products = [],
+  warehouses = [],
   onRefresh,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [actionLoading, setActionLoading] = useState({});
   const [feedback, setFeedback] = useState('');
 
-  // Ready/pending tasks
+  // Ready/pending tasks awaiting verification on the warehouse floor
   const readyReceipts = React.useMemo(() => {
     return receipts.filter((r) => r.status !== 'done' && r.status !== 'canceled');
   }, [receipts]);
@@ -48,10 +54,10 @@ export const StaffDashboardView = ({
     setFeedback('');
     try {
       await receiptService.validateReceipt(id);
-      setFeedback('✅ Inbound shipment received into warehouse stock successfully!');
+      setFeedback('✅ Inbound freight verified & received into warehouse inventory!');
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert(err.response?.data?.message || 'Receipt intake failed');
+      alert(err.response?.data?.message || 'Receipt intake verification failed');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`rec-${id}`]: false }));
     }
@@ -63,10 +69,10 @@ export const StaffDashboardView = ({
     setFeedback('');
     try {
       await deliveryService.validateDelivery(id);
-      setFeedback('✅ Outbound order dispatched and stock deducted successfully!');
+      setFeedback('✅ Outbound order inspected & confirmed for courier dispatch!');
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert(err.response?.data?.message || 'Delivery dispatch failed');
+      alert(err.response?.data?.message || 'Delivery dispatch verification failed');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`del-${id}`]: false }));
     }
@@ -78,10 +84,10 @@ export const StaffDashboardView = ({
     setFeedback('');
     try {
       await transferService.validateTransfer(id);
-      setFeedback('✅ Internal warehouse transfer executed cleanly!');
+      setFeedback('✅ Inter-warehouse transfer verified & completed!');
       if (onRefresh) onRefresh();
     } catch (err) {
-      alert(err.response?.data?.message || 'Transfer execution failed');
+      alert(err.response?.data?.message || 'Transfer execution verification failed');
     } finally {
       setActionLoading((prev) => ({ ...prev, [`trf-${id}`]: false }));
     }
@@ -105,7 +111,7 @@ export const StaffDashboardView = ({
         </div>
       )}
 
-      {/* Staff Fast Action KPI Cards */}
+      {/* Staff Fast Verification KPI Cards */}
       <div
         style={{
           display: 'grid',
@@ -115,7 +121,7 @@ export const StaffDashboardView = ({
       >
         <StatCard
           title="Inbound Receiving Dock"
-          subtitle="Shipments awaiting stock intake"
+          subtitle="Shipments awaiting floor verification"
           value={formatNumber(readyReceipts.length)}
           icon={<ArrowDownLeft size={22} />}
           accent="emerald"
@@ -126,7 +132,7 @@ export const StaffDashboardView = ({
         />
         <StatCard
           title="Outbound Dispatch Staging"
-          subtitle="Orders ready for carrier pickup"
+          subtitle="Orders awaiting dispatch verification"
           value={formatNumber(readyDeliveries.length)}
           icon={<ArrowUpRight size={22} />}
           accent="rose"
@@ -137,7 +143,7 @@ export const StaffDashboardView = ({
         />
         <StatCard
           title="Facility Transfer Orders"
-          subtitle="Items moving between hubs"
+          subtitle="Movements awaiting transit verification"
           value={formatNumber(activeTransfersList.length)}
           icon={<Repeat size={22} />}
           accent="amber"
@@ -148,37 +154,28 @@ export const StaffDashboardView = ({
         />
       </div>
 
-      {/* Staff Quick Actions Banner */}
+      {/* Floor Verification Notice Banner */}
       <div
         className="glass-panel"
         style={{
-          padding: '16px 20px',
+          padding: '14px 20px',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(17, 24, 39, 0.6) 100%)',
+          gap: '14px',
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          borderRadius: 'var(--radius-sm)',
         }}
       >
-        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff' }}>Floor Worker Fast Tasks:</span>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => navigate('/receipts/new')}
-            className="btn-primary"
-            style={{ fontSize: '0.825rem', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Plus size={14} />
-            <span>Receive New Shipment</span>
-          </button>
-          <button
-            onClick={() => navigate('/transfers/new')}
-            className="btn-secondary"
-            style={{ fontSize: '0.825rem', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Repeat size={14} />
-            <span>Move Items To Another Hub</span>
-          </button>
+        <ShieldCheck size={22} color="#fbbf24" style={{ flexShrink: 0 }} />
+        <div>
+          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fef3c7' }}>
+            Floor Verification & Inspection Authority:
+          </span>
+          <span style={{ fontSize: '0.85rem', color: '#d1d5db', marginLeft: '8px' }}>
+            All purchase receipts, deliveries, and inter-hub transfers are initiated by Inventory Managers or Admins.
+            Your role on the floor is to physically inspect shipments and verify/confirm intake, dispatch, and transit moves.
+          </span>
         </div>
       </div>
 
@@ -193,7 +190,7 @@ export const StaffDashboardView = ({
               </h3>
             </div>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-              Inspect and validate stock intakes directly from incoming freight carriers
+              Inspect and verify physical stock intakes directly from incoming freight carriers
             </p>
           </div>
           <button
@@ -207,7 +204,7 @@ export const StaffDashboardView = ({
 
         {readyReceipts.length === 0 ? (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            No incoming shipments pending intake at the moment.
+            No incoming shipments pending dock verification at the moment.
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -253,7 +250,7 @@ export const StaffDashboardView = ({
                     className="btn-primary"
                     style={{ fontSize: '0.8rem', padding: '6px 14px', background: '#059669', borderColor: '#10b981' }}
                   >
-                    {actionLoading[`rec-${rec._id}`] ? 'Receiving...' : '✓ Receive & Validate Stock'}
+                    {actionLoading[`rec-${rec._id}`] ? 'Verifying...' : '✓ Verify & Receive Freight'}
                   </button>
                 </div>
               </div>
@@ -273,7 +270,7 @@ export const StaffDashboardView = ({
               </h3>
             </div>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-              Confirm pick lists and release orders to courier & logistics carriers
+              Verify pick lists and release orders to courier & logistics carriers
             </p>
           </div>
           <button
@@ -287,7 +284,7 @@ export const StaffDashboardView = ({
 
         {readyDeliveries.length === 0 ? (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            No outbound customer orders pending dispatch.
+            No outbound customer orders pending dispatch verification.
           </p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -333,7 +330,7 @@ export const StaffDashboardView = ({
                     className="btn-primary"
                     style={{ fontSize: '0.8rem', padding: '6px 14px', background: '#dc2626', borderColor: '#ef4444' }}
                   >
-                    {actionLoading[`del-${del._id}`] ? 'Dispatching...' : '🚀 Validate & Dispatch'}
+                    {actionLoading[`del-${del._id}`] ? 'Dispatching...' : '🚀 Inspect & Confirm Dispatch'}
                   </button>
                 </div>
               </div>
@@ -353,7 +350,7 @@ export const StaffDashboardView = ({
               </h3>
             </div>
             <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-              Execute physical inventory movement between logistics facilities
+              Verify and confirm physical inventory movement between logistics facilities
             </p>
           </div>
           <button
@@ -413,7 +410,7 @@ export const StaffDashboardView = ({
                     className="btn-primary"
                     style={{ fontSize: '0.8rem', padding: '6px 14px', background: '#d97706', borderColor: '#f59e0b' }}
                   >
-                    {actionLoading[`trf-${trf._id}`] ? 'Transferring...' : '⚡ Execute Transfer'}
+                    {actionLoading[`trf-${trf._id}`] ? 'Transferring...' : '⚡ Verify & Execute Transfer'}
                   </button>
                 </div>
               </div>
@@ -424,3 +421,4 @@ export const StaffDashboardView = ({
     </div>
   );
 };
+

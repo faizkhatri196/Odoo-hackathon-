@@ -30,6 +30,16 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Warehouse',
     },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
+    companyName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     resetPasswordOtp: String,
     resetPasswordExpires: Date,
     isActive: {

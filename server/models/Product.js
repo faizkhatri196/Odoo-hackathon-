@@ -26,10 +26,14 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Product name is required'],
       trim: true,
     },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     sku: {
       type: String,
       required: [true, 'SKU is required'],
-      unique: true,
       uppercase: true,
       trim: true,
     },
@@ -108,5 +112,7 @@ productSchema.virtual('reorderPoint').set(function (val) {
 // Indexes for fast search
 productSchema.index({ name: 1 });
 productSchema.index({ category: 1, isActive: 1 });
+productSchema.index({ company: 1, sku: 1 });
+productSchema.index({ company: 1, isActive: 1 });
 
 module.exports = mongoose.model('Product', productSchema);

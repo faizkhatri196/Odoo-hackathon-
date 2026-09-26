@@ -19,6 +19,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const warehouseRoutes = require('./routes/warehouseRoutes');
 const reorderRuleRoutes = require('./routes/reorderRuleRoutes');
+const teamRoutes = require('./routes/teamRoutes');
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/transfers', transferRoutes);
 app.use('/api/adjustments', adjustmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ledger', ledgerRoutes);
+app.use('/api/team', teamRoutes);
 
 // Error Handling
 app.use(notFound);

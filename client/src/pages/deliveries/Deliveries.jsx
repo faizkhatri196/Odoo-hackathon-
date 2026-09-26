@@ -6,11 +6,16 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { Loading } from '../../components/Loading';
 import { deliveryService } from '../../services/deliveryService';
 import { formatDate } from '../../utils/formatDate';
+import { useAuth } from '../../hooks/useAuth';
 
 export const Deliveries = () => {
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isStaff = user?.role === 'warehouse_staff';
+  const isManagerOrAdmin = user?.role === 'inventory_manager' || user?.role === 'admin';
 
   useEffect(() => {
     const load = async () => {
@@ -37,12 +42,18 @@ export const Deliveries = () => {
   return (
     <div>
       <PageHeader
-        title="Outgoing Deliveries"
-        description="Manage customer shipments, dispatches and delivery orders."
+        title={isStaff ? 'Outbound Dispatch Bay' : 'Outgoing Deliveries & Shipments'}
+        description={
+          isStaff
+            ? 'Warehouse pick, pack, and vehicle loading queue for orders assigned to your facility.'
+            : 'Manage customer sales shipments, dispatch schedules, and inventory allocation.'
+        }
         actions={
-          <button className="btn-primary" onClick={() => navigate('/deliveries/new')}>
-            + Create Delivery
-          </button>
+          isManagerOrAdmin && (
+            <button className="btn-primary" onClick={() => navigate('/deliveries/new')}>
+              + Create Delivery Order
+            </button>
+          )
         }
       />
 

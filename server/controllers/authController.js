@@ -3,6 +3,10 @@ const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 const generateOTP = require('../utils/generateOTP');
 
+const Company = require('../models/Company');
+const Warehouse = require('../models/Warehouse');
+const Category = require('../models/Category');
+
 exports.signup = async (req, res, next) => {
   try {
     if (mongoose.connection.readyState !== 1) {
@@ -12,24 +16,79 @@ exports.signup = async (req, res, next) => {
       });
     }
 
-    const { name, email, password, role, warehouse } = req.body;
-    const existingUser = await User.findOne({ email });
+    const { name, email, password, role, companyName, warehouse } = req.body;
+    const normalizedEmail = (email || '').trim().toLowerCase();
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
 
-    const userData = { name, email, password };
-    if (role) userData.role = role;
+    // Determine Company for this registration
+    let companyDoc = null;
+    const finalRole = role || 'admin';
+
+    // If companyName is provided or this is an admin registration, create an isolated company
+    if (companyName || finalRole === 'admin') {
+      const finalCompName = (companyName || `${name}'s Logistics Enterprise`).trim();
+      const rawCode = finalCompName.replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase() || 'CORP';
+      companyDoc = await Company.create({
+        name: finalCompName,
+        code: rawCode,
+        currency: 'USD',
+      });
+    }
+
+    const userData = {
+      name: (name || '').trim(),
+      email: normalizedEmail,
+      password,
+      role: finalRole,
+      company: companyDoc ? companyDoc._id : null,
+      companyName: companyDoc ? companyDoc.name : '',
+    };
+
     if (warehouse) userData.warehouse = warehouse;
 
     const user = await User.create(userData);
+
+    // If company was created, link admin and provision default starter facility
+    if (companyDoc) {
+      companyDoc.admin = user._id;
+      await companyDoc.save();
+
+      // Automatically provision initial warehouse facility for this new company
+      const initialWh = await Warehouse.create({
+        company: companyDoc._id,
+        name: `${companyDoc.name} Central Logistics Hub`,
+        code: `WH-${companyDoc.code || 'MAIN'}`,
+        location: { address: 'Primary Logistics Hub, Gate 1', city: 'Metropolitan Logistics Park' },
+        capacity: 50000,
+        manager: user._id,
+        isActive: true,
+      });
+
+      user.warehouse = initialWh._id;
+      await user.save();
+
+      // Provision starter standard categories for this company
+      await Category.insertMany([
+        { company: companyDoc._id, name: 'Industrial Electronics & Motors', code: 'ELEC' },
+        { company: companyDoc._id, name: 'Raw Materials & Metals', code: 'METL' },
+        { company: companyDoc._id, name: 'Safety & Warehouse Supplies', code: 'SAFE' },
+      ]).catch(() => {});
+    }
+
     const token = generateToken(user._id, user.role);
 
     const userPayload = {
       id: user._id,
+      _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      company: user.company || null,
+      companyName: user.companyName || '',
       warehouse: user.warehouse || null,
     };
 
@@ -62,7 +121,12 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    const user = await User.findOne({ email }).select('+password');
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail })
+      .select('+password')
+      .populate('company', 'name code')
+      .populate('warehouse', 'name code');
+
     if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
@@ -75,9 +139,12 @@ exports.login = async (req, res, next) => {
 
     const userPayload = {
       id: user._id,
+      _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      company: user.company?._id || user.company || null,
+      companyName: user.company?.name || user.companyName || '',
       warehouse: user.warehouse || null,
     };
 
@@ -186,7 +253,9 @@ exports.resetPassword = async (req, res, next) => {
 
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).populate('warehouse', 'name code');
+    const user = await User.findById(req.user.id)
+      .populate('warehouse', 'name code')
+      .populate('company', 'name code');
     res.json({
       success: true,
       user,

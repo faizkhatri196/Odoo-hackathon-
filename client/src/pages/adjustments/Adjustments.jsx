@@ -6,8 +6,10 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { Loading } from '../../components/Loading';
 import { adjustmentService } from '../../services/adjustmentService';
 import { formatDate } from '../../utils/formatDate';
+import { useAuth } from '../../hooks/useAuth';
 
 export const Adjustments = () => {
+  const { user } = useAuth();
   const [adjustments, setAdjustments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [applyingId, setApplyingId] = useState(null);
@@ -86,9 +88,11 @@ export const Adjustments = () => {
         title="Physical Inventory Adjustments"
         description="Reconcile recorded stock levels against physical warehouse counts."
         actions={
-          <button className="btn-primary" onClick={() => navigate('/adjustments/new')}>
-            + New Adjustment
-          </button>
+          (user?.role === 'admin' || user?.role === 'inventory_manager') && (
+            <button className="btn-primary" onClick={() => navigate('/adjustments/new')}>
+              + New Adjustment
+            </button>
+          )
         }
       />
 

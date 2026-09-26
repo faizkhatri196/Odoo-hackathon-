@@ -31,10 +31,14 @@ const deliveryItemSchema = new mongoose.Schema(
 
 const deliverySchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     deliveryNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     customer: {
       name: { type: String, required: true },
@@ -69,5 +73,8 @@ const deliverySchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+deliverySchema.index({ company: 1, deliveryNumber: 1 });
+deliverySchema.index({ company: 1, status: 1 });
 
 module.exports = mongoose.model('Delivery', deliverySchema);

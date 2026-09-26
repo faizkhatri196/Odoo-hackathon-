@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const connectDB = require('../config/db');
+const Company = require('../models/Company');
 const User = require('../models/User');
 const Warehouse = require('../models/Warehouse');
 const Location = require('../models/Location');
@@ -29,6 +30,7 @@ const seedRealLifeData = async () => {
 
     console.log('🧹 Purging prior collections for a fresh enterprise setup...');
     await Promise.all([
+      Company.deleteMany({}),
       User.deleteMany({}),
       Warehouse.deleteMany({}),
       Location.deleteMany({}),
@@ -43,39 +45,56 @@ const seedRealLifeData = async () => {
       Adjustment.deleteMany({}),
     ]);
 
+    // 0. PRIMARY ENTERPRISE COMPANY
+    console.log('🏢 Creating primary enterprise company...');
+    const defaultCompany = await Company.create({
+      name: 'StockSense Global Logistics',
+      code: 'SSGL',
+      currency: 'USD',
+    });
+
     // 1. REAL USERS
     console.log('👤 Creating enterprise team users...');
-    const salt = await bcrypt.genSalt(10);
-    const pass1 = await bcrypt.hash('admin123', salt);
-    const pass2 = await bcrypt.hash('password123', salt);
+    const adminPassword = 'password123';
+    const staffPassword = 'password123';
 
     const admin = await User.create({
       name: 'Faiz Khatri (Chief Operations Officer)',
       email: 'admin@stocksense.com',
-      password: pass1,
+      password: adminPassword,
       role: ROLES.ADMIN,
+      company: defaultCompany._id,
+      companyName: defaultCompany.name,
       isActive: true,
     });
+
+    defaultCompany.admin = admin._id;
+    await defaultCompany.save();
 
     const manager = await User.create({
       name: 'Rajesh Sharma (Warehouse Operations Director)',
       email: 'manager@stocksense.com',
-      password: pass2,
+      password: staffPassword,
       role: ROLES.INVENTORY_MANAGER,
+      company: defaultCompany._id,
+      companyName: defaultCompany.name,
       isActive: true,
     });
 
     const staff = await User.create({
       name: 'Amit Patel (Logistics & Receiving Supervisor)',
       email: 'staff@stocksense.com',
-      password: pass2,
+      password: staffPassword,
       role: ROLES.WAREHOUSE_STAFF,
+      company: defaultCompany._id,
+      companyName: defaultCompany.name,
       isActive: true,
     });
 
     // 2. REAL ENTERPRISE WAREHOUSES
     console.log('🏢 Creating real-world logistics facilities...');
     const whMumbai = await Warehouse.create({
+      company: defaultCompany._id,
       name: 'Mumbai Central Fulfillment Hub',
       code: 'WH-MUM',
       location: {
@@ -91,6 +110,7 @@ const seedRealLifeData = async () => {
     });
 
     const whAhmedabad = await Warehouse.create({
+      company: defaultCompany._id,
       name: 'Ahmedabad Logistics & Distribution Park',
       code: 'WH-AMD',
       location: {
@@ -106,6 +126,7 @@ const seedRealLifeData = async () => {
     });
 
     const whBengaluru = await Warehouse.create({
+      company: defaultCompany._id,
       name: 'Bengaluru Tech & Electronics Depot',
       code: 'WH-BLR',
       location: {
@@ -121,6 +142,7 @@ const seedRealLifeData = async () => {
     });
 
     const whDelhi = await Warehouse.create({
+      company: defaultCompany._id,
       name: 'Delhi NCR Multi-Modal Freight Terminal',
       code: 'WH-DEL',
       location: {
@@ -385,6 +407,7 @@ const seedRealLifeData = async () => {
     const createdProducts = [];
     for (const p of rawProducts) {
       const prod = await Product.create({
+        company: defaultCompany._id,
         name: p.name,
         sku: p.sku,
         category: p.category,
@@ -431,6 +454,7 @@ const seedRealLifeData = async () => {
 
     // Receipt 1 (DONE): Validated from Tata Steel into Mumbai
     const rec1 = await Receipt.create({
+      company: defaultCompany._id,
       receiptNumber: 'REC-2026-0001',
       supplier: {
         name: 'Tata Steel BSL Limited',
@@ -468,6 +492,7 @@ const seedRealLifeData = async () => {
 
     // Receipt 2 (DONE): Siemens Motors received into Mumbai
     const rec2 = await Receipt.create({
+      company: defaultCompany._id,
       receiptNumber: 'REC-2026-0002',
       supplier: {
         name: 'Siemens Logistics & Automation India',
@@ -504,6 +529,7 @@ const seedRealLifeData = async () => {
 
     // Receipt 3 (READY): Schneider Contactors awaiting user validation in UI!
     await Receipt.create({
+      company: defaultCompany._id,
       receiptNumber: 'REC-2026-0003',
       supplier: {
         name: 'Schneider Electric Enterprise Solutions',
@@ -529,6 +555,7 @@ const seedRealLifeData = async () => {
 
     // Receipt 4 (WAITING): Bosch Tools in transit
     await Receipt.create({
+      company: defaultCompany._id,
       receiptNumber: 'REC-2026-0004',
       supplier: {
         name: 'Bosch Rexroth Industrial Technologies',
@@ -557,6 +584,7 @@ const seedRealLifeData = async () => {
 
     // Delivery 1 (DONE): Dispatched to Larsen & Toubro from Mumbai
     const del1 = await Delivery.create({
+      company: defaultCompany._id,
       deliveryNumber: 'DEL-2026-0001',
       customer: {
         name: 'Larsen & Toubro Heavy Infrastructure Ltd',
@@ -592,6 +620,7 @@ const seedRealLifeData = async () => {
 
     // Delivery 2 (DONE): ABB PLCs dispatched to Reliance Infra from Bengaluru
     const del2 = await Delivery.create({
+      company: defaultCompany._id,
       deliveryNumber: 'DEL-2026-0002',
       customer: {
         name: 'Reliance Infrastructure & Petrochemicals Hub',
@@ -627,6 +656,7 @@ const seedRealLifeData = async () => {
 
     // Delivery 3 (READY): Mahindra Logistics order awaiting user dispatch in UI!
     await Delivery.create({
+      company: defaultCompany._id,
       deliveryNumber: 'DEL-2026-0003',
       customer: {
         name: 'Mahindra Logistics Integrated Supply Hub',
@@ -652,6 +682,7 @@ const seedRealLifeData = async () => {
 
     // Delivery 4 (WAITING): Bharat Heavy Electricals order
     await Delivery.create({
+      company: defaultCompany._id,
       deliveryNumber: 'DEL-2026-0004',
       customer: {
         name: 'Bharat Heavy Electricals Limited (BHEL)',
@@ -680,6 +711,7 @@ const seedRealLifeData = async () => {
 
     // Transfer 1 (DONE): 15 Siemens Motors from Mumbai Hub to Ahmedabad Park
     const trf1 = await Transfer.create({
+      company: defaultCompany._id,
       transferNumber: 'TRF-2026-0001',
       fromWarehouse: whMumbai._id,
       toWarehouse: whAhmedabad._id,
@@ -708,6 +740,7 @@ const seedRealLifeData = async () => {
 
     // Transfer 2 (READY): High Tensile Bolts from Ahmedabad to Delhi Hub awaiting user execution!
     await Transfer.create({
+      company: defaultCompany._id,
       transferNumber: 'TRF-2026-0002',
       fromWarehouse: whAhmedabad._id,
       toWarehouse: whDelhi._id,
@@ -725,6 +758,7 @@ const seedRealLifeData = async () => {
 
     // Transfer 3 (WAITING): 3M Stretch Wrap from Delhi to Bengaluru
     await Transfer.create({
+      company: defaultCompany._id,
       transferNumber: 'TRF-2026-0003',
       fromWarehouse: whDelhi._id,
       toWarehouse: whBengaluru._id,
@@ -747,6 +781,7 @@ const seedRealLifeData = async () => {
     const countedQty = expectedQty; // Discrepancy checked
 
     await Adjustment.create({
+      company: defaultCompany._id,
       adjustmentNumber: 'ADJ-2026-0001',
       warehouse: whMumbai._id,
       notes: 'Bi-weekly cycle count audit: Zero variance confirmed.',

@@ -19,10 +19,14 @@ const transferItemSchema = new mongoose.Schema(
 
 const transferSchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     transferNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     fromWarehouse: {
       type: mongoose.Schema.Types.ObjectId,
@@ -53,5 +57,8 @@ const transferSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+transferSchema.index({ company: 1, transferNumber: 1 });
+transferSchema.index({ company: 1, status: 1 });
 
 module.exports = mongoose.model('Transfer', transferSchema);

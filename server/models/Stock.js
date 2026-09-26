@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 const stockSchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
@@ -48,6 +53,7 @@ const stockSchema = new mongoose.Schema(
 
 // One stock record per (product, warehouse, location)
 stockSchema.index({ product: 1, warehouse: 1, location: 1 }, { unique: true });
+stockSchema.index({ company: 1, warehouse: 1 });
 
 // Ensure available quantity is kept in sync
 stockSchema.pre('save', function (next) {

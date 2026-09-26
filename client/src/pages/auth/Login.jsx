@@ -15,7 +15,7 @@ export const Login = () => {
     setError('');
     setLoading(true);
     try {
-      await login({ email, password });
+      await login({ email: email.trim().toLowerCase(), password });
       navigate('/');
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Login failed. Please verify credentials.';
@@ -74,7 +74,7 @@ export const Login = () => {
         </button>
       </form>
 
-      <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+      <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
         Don't have an account? <Link to="/signup" style={{ color: 'var(--primary)', fontWeight: 600 }}>Create account</Link>
       </div>
     </div>

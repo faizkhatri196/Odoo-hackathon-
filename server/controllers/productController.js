@@ -23,6 +23,9 @@ exports.getProducts = async (req, res, next) => {
     } = req.query;
 
     const query = { isActive: true };
+    if (req.user?.company) {
+      query.company = req.user.company;
+    }
 
     if (search && search.trim()) {
       const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -156,13 +159,16 @@ exports.createProduct = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'SKU is required' });
     }
 
-    // Check duplicate SKU
-    const existing = await Product.findOne({ sku: normalizedSku });
+    // Check duplicate SKU for this company
+    const existing = await Product.findOne({
+      sku: normalizedSku,
+      ...(req.user?.company ? { company: req.user.company } : {}),
+    });
     if (existing) {
       return res.status(409).json({
         success: false,
         code: 'DUPLICATE_SKU',
-        message: `SKU "${normalizedSku}" already exists`,
+        message: `SKU "${normalizedSku}" already exists in your company catalog`,
       });
     }
 
@@ -173,6 +179,7 @@ exports.createProduct = async (req, res, next) => {
 
     // Create product
     const product = new Product({
+      company: req.user?.company || null,
       name: (name || '').trim(),
       sku: normalizedSku,
       barcode: (barcode || '').trim(),

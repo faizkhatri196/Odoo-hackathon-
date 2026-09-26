@@ -11,6 +11,7 @@ exports.getWarehouses = async (req, res, next) => {
     const { active } = req.query;
     const filter = {};
     if (active !== undefined) filter.isActive = active === 'true' || active === true;
+    if (req.user?.company) filter.company = req.user.company;
 
     const warehouses = await Warehouse.find(filter).sort({ name: 1 }).lean();
 
@@ -41,7 +42,10 @@ exports.createWarehouse = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Warehouse code is required' });
     }
 
-    const existing = await Warehouse.findOne({ code: normalizedCode });
+    const existing = await Warehouse.findOne({
+      code: normalizedCode,
+      ...(req.user?.company ? { company: req.user.company } : {}),
+    });
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -56,6 +60,7 @@ exports.createWarehouse = async (req, res, next) => {
       location: typeof location === 'string' ? { address: location } : location,
       capacity: Number(capacity) || 10000,
       manager: req.user?._id || null,
+      company: req.user?.company || null,
       isActive: true,
     });
 

@@ -8,7 +8,7 @@ const {
   updateDelivery,
   validateDelivery,
 } = require('../controllers/deliveryController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/validationMiddleware');
 
 const createDeliveryRules = [
@@ -17,10 +17,15 @@ const createDeliveryRules = [
 ];
 
 router.use(protect);
-router.route('/').get(getDeliveries).post(createDeliveryRules, createDelivery);
-router.route('/:id').get(getDeliveryById).put(updateDelivery);
+router.route('/')
+  .get(getDeliveries)
+  .post(authorize('admin', 'inventory_manager'), createDeliveryRules, createDelivery);
+
+router.route('/:id')
+  .get(getDeliveryById)
+  .put(authorize('admin', 'inventory_manager'), updateDelivery);
+
+// Staff can inspect & validate/dispatch outbound shipments
 router.post('/:id/validate', validateDelivery);
 
 module.exports = router;
-
-

@@ -38,6 +38,7 @@ const resetPasswordRules = [
 ];
 
 router.post('/signup', signupRules, signup);
+router.post('/register', signupRules, signup);
 router.post('/login', loginRules, login);
 router.post('/logout', logout);
 router.post('/forgot-password', forgotPasswordRules, forgotPassword);

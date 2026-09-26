@@ -6,7 +6,7 @@ const StockLedger = require('../models/StockLedger');
 const { isDbConnected } = require('../config/db');
 
 class DashboardService {
-  static async getSummaryMetrics(query = {}) {
+  static async getSummaryMetrics(query = {}, companyId = null) {
     if (!isDbConnected()) {
       return {
         totalProducts: 0,
@@ -20,7 +20,8 @@ class DashboardService {
     }
 
     try {
-      const activityFilter = {};
+      const companyFilter = companyId ? { company: companyId } : {};
+      const activityFilter = { ...companyFilter };
 
       if (query.type && query.type !== 'ALL') {
         activityFilter.transactionType = { $regex: query.type, $options: 'i' };
@@ -42,11 +43,11 @@ class DashboardService {
         activeTransfers,
         recentActivities,
       ] = await Promise.all([
-        Product.countDocuments({ isActive: true }),
-        Product.find({ isActive: true }).select('totalQuantity costPrice minReorderLevel category'),
-        Receipt.countDocuments({ status: { $in: ['draft', 'waiting', 'ready'] } }),
-        Delivery.countDocuments({ status: { $in: ['draft', 'waiting', 'ready'] } }),
-        Transfer.countDocuments({ status: { $in: ['draft', 'waiting', 'ready', 'in-transit'] } }),
+        Product.countDocuments({ isActive: true, ...companyFilter }),
+        Product.find({ isActive: true, ...companyFilter }).select('totalQuantity costPrice minReorderLevel category'),
+        Receipt.countDocuments({ status: { $in: ['draft', 'waiting', 'ready'] }, ...companyFilter }),
+        Delivery.countDocuments({ status: { $in: ['draft', 'waiting', 'ready'] }, ...companyFilter }),
+        Transfer.countDocuments({ status: { $in: ['draft', 'waiting', 'ready', 'in-transit'] }, ...companyFilter }),
         StockLedger.find(activityFilter)
           .populate('product', 'name sku category')
           .populate('warehouse', 'name code')
@@ -87,52 +88,71 @@ class DashboardService {
     }
   }
 
-  static async getLowStockProducts() {
+  static async getLowStockProducts(companyId = null) {
     if (!isDbConnected()) return [];
 
-    return await Product.find({
+    const filter = {
       isActive: true,
       $expr: { $lte: ['$totalQuantity', '$minReorderLevel'] },
-    })
+    };
+    if (companyId) filter.company = companyId;
+
+    return await Product.find(filter)
       .populate('warehouseStock.warehouse', 'name code')
       .sort({ totalQuantity: 1 });
   }
 
-  static async getPendingReceipts(limit = 20) {
+  static async getPendingReceipts(limit = 20, companyId = null) {
     if (!isDbConnected()) return [];
 
-    return await Receipt.find({
+    const filter = {
       status: { $in: ['draft', 'waiting', 'ready'] },
-    })
+    };
+    if (companyId) filter.company = companyId;
+
+    return await Receipt.find(filter)
       .populate('warehouse', 'name code location')
       .populate('items.product', 'name sku unitOfMeasure')
       .sort({ scheduledDate: 1, createdAt: -1 })
       .limit(Number(limit));
   }
 
-  static async getPendingDeliveries(limit = 20) {
+  static async getPendingDeliveries(limit = 20, companyId = null) {
     if (!isDbConnected()) return [];
 
-    return await Delivery.find({
+    const filter = {
       status: { $in: ['draft', 'waiting', 'ready'] },
-    })
+    };
+    if (companyId) filter.company = companyId;
+
+    return await Delivery.find(filter)
       .populate('warehouse', 'name code location')
       .populate('items.product', 'name sku unitOfMeasure')
       .sort({ scheduledDate: 1, createdAt: -1 })
       .limit(Number(limit));
   }
 
-  static async getDashboardTransfers(limit = 20) {
-    if (!isDbConnected()) return [];
+  static async getTransfersSummary(companyId = null) {
+    if (!isDbConnected()) {
+      return { pendingCount: 0, recentTransfers: [] };
+    }
 
-    return await Transfer.find({
+    const filter = {
       status: { $in: ['draft', 'waiting', 'ready', 'in-transit'] },
-    })
-      .populate('fromWarehouse', 'name code location')
-      .populate('toWarehouse', 'name code location')
-      .populate('items.product', 'name sku unitOfMeasure')
-      .sort({ createdAt: -1 })
-      .limit(Number(limit));
+    };
+    if (companyId) filter.company = companyId;
+
+    const [pendingCount, recentTransfers] = await Promise.all([
+      Transfer.countDocuments(filter),
+      Transfer.find(companyId ? { company: companyId } : {})
+        .populate('fromWarehouse', 'name code')
+        .populate('toWarehouse', 'name code')
+        .populate('items.product', 'name sku')
+        .sort({ createdAt: -1 })
+        .limit(5),
+    ]);
+
+    return { pendingCount, recentTransfers };
   }
 }
 

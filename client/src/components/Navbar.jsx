@@ -1,10 +1,19 @@
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Menu, X, Boxes, Bell, User, LogOut } from 'lucide-react';
+import { Menu, X, Boxes, Bell, User, LogOut, Building2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 export const Navbar = ({ onToggleSidebar, isSidebarOpen }) => {
   const { user, logout } = useAuth();
+
+  const formattedRole =
+    user?.role === 'admin'
+      ? 'Administrator'
+      : user?.role === 'inventory_manager'
+      ? 'Inventory Manager'
+      : user?.role === 'warehouse_staff'
+      ? 'Warehouse Staff'
+      : user?.role || 'Staff Member';
 
   return (
     <header
@@ -78,6 +87,39 @@ export const Navbar = ({ onToggleSidebar, isSidebarOpen }) => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        {/* Company Organization Badge */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 12px',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: '0.8rem',
+            color: 'var(--text-muted)',
+          }}
+          className="company-nav-badge"
+        >
+          <Building2 size={14} color="#818cf8" />
+          <span style={{ color: '#fff', fontWeight: 600, maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user?.company?.name || user?.companyName || 'StockSense Logistics'}
+          </span>
+          <span
+            style={{
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              padding: '1px 6px',
+              borderRadius: '4px',
+              background: 'rgba(99, 102, 241, 0.2)',
+              color: '#a5b4fc',
+            }}
+          >
+            {user?.company?.code || 'ORG'}
+          </span>
+        </div>
+
         <button
           style={{
             background: 'rgba(255, 255, 255, 0.04)',
@@ -112,9 +154,9 @@ export const Navbar = ({ onToggleSidebar, isSidebarOpen }) => {
           to="/profile"
           style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 8px', borderRadius: 'var(--radius-sm)' }}
         >
-          <div style={{ textAlign: 'right', display: 'none', '@media (min-width: 640px)': { display: 'block' } }} className="user-text-info">
-            <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#fff', margin: 0 }}>{user?.name || 'Inventory Manager'}</p>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>{user?.role || 'Staff Member'}</p>
+          <div style={{ textAlign: 'right' }} className="user-text-info">
+            <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#fff', margin: 0 }}>{user?.name || 'Authorized Member'}</p>
+            <p style={{ fontSize: '0.75rem', color: '#818cf8', fontWeight: 600, margin: 0 }}>{formattedRole}</p>
           </div>
           <div
             style={{

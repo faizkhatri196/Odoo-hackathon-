@@ -6,11 +6,16 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { Loading } from '../../components/Loading';
 import { transferService } from '../../services/transferService';
 import { formatDate } from '../../utils/formatDate';
+import { useAuth } from '../../hooks/useAuth';
 
 export const Transfers = () => {
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isStaff = user?.role === 'warehouse_staff';
+  const isManagerOrAdmin = user?.role === 'inventory_manager' || user?.role === 'admin';
 
   useEffect(() => {
     const load = async () => {
@@ -37,12 +42,18 @@ export const Transfers = () => {
   return (
     <div>
       <PageHeader
-        title="Internal Stock Transfers"
-        description="Move items between warehouses or internal locations."
+        title={isStaff ? 'Inter-Facility Freight Bay' : 'Internal Stock Transfers'}
+        description={
+          isStaff
+            ? 'Execute truck loading, transit dispatch, and receiving for your warehouse facility.'
+            : 'Plan and balance inventory distribution across regional logistics hubs.'
+        }
         actions={
-          <button className="btn-primary" onClick={() => navigate('/transfers/new')}>
-            + Create Transfer
-          </button>
+          isManagerOrAdmin && (
+            <button className="btn-primary" onClick={() => navigate('/transfers/new')}>
+              + Plan New Transfer
+            </button>
+          )
         }
       />
 

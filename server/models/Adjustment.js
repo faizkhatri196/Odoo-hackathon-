@@ -30,10 +30,14 @@ const adjustmentItemSchema = new mongoose.Schema(
 
 const adjustmentSchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     adjustmentNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     warehouse: {
       type: mongoose.Schema.Types.ObjectId,
@@ -58,5 +62,8 @@ const adjustmentSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+adjustmentSchema.index({ company: 1, adjustmentNumber: 1 });
+adjustmentSchema.index({ company: 1, status: 1 });
 
 module.exports = mongoose.model('Adjustment', adjustmentSchema);

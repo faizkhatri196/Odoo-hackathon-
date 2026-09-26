@@ -103,9 +103,12 @@ class StockService {
       stockQuery.location = locationId;
     }
 
+    const compId = product.company || warehouse.company || null;
+
     let stockRecord = await Stock.findOne(stockQuery);
     if (!stockRecord) {
       stockRecord = new Stock({
+        company: compId,
         product: productId,
         warehouse: warehouseId,
         location: locationId || null,
@@ -116,6 +119,7 @@ class StockService {
       });
       await stockRecord.save();
     } else {
+      if (!stockRecord.company && compId) stockRecord.company = compId;
       stockRecord.quantity = newQty;
       stockRecord.availableQuantity = Math.max(0, newQty - (stockRecord.reservedQuantity || 0));
       await stockRecord.save();
@@ -123,6 +127,7 @@ class StockService {
 
     // 3. Create Immutable StockLedger Entry
     const ledgerEntry = await StockLedger.create({
+      company: compId,
       transactionType: transactionType || TRANSACTION_TYPES.ADJUSTMENT,
       product: productId,
       warehouse: warehouseId,

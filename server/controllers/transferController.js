@@ -8,10 +8,18 @@ exports.getTransfers = async (req, res, next) => {
   try {
     const { status, fromWarehouse, toWarehouse, search } = req.query;
     const filter = {};
+    if (req.user?.company) filter.company = req.user.company;
 
+    if (req.user?.role === 'warehouse_staff' && req.user?.warehouse) {
+      filter.$or = [
+        { fromWarehouse: req.user.warehouse },
+        { toWarehouse: req.user.warehouse },
+      ];
+    } else {
+      if (fromWarehouse && fromWarehouse !== 'ALL') filter.fromWarehouse = fromWarehouse;
+      if (toWarehouse && toWarehouse !== 'ALL') filter.toWarehouse = toWarehouse;
+    }
     if (status && status !== 'ALL') filter.status = status;
-    if (fromWarehouse && fromWarehouse !== 'ALL') filter.fromWarehouse = fromWarehouse;
-    if (toWarehouse && toWarehouse !== 'ALL') filter.toWarehouse = toWarehouse;
     if (search) {
       filter.transferNumber = { $regex: search, $options: 'i' };
     }
@@ -84,6 +92,7 @@ exports.createTransfer = async (req, res, next) => {
     }
 
     const transfer = await Transfer.create({
+      company: req.user?.company || null,
       transferNumber,
       fromWarehouse,
       toWarehouse,

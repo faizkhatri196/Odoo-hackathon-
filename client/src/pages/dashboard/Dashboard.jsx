@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/PageHeader';
 import { Loading } from '../../components/Loading';
 import { useAuth } from '../../hooks/useAuth';
 import { dashboardService } from '../../services/dashboardService';
@@ -23,16 +22,8 @@ export const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Role can be defaulted to the logged in user's role
-  const userRole = user?.role || 'admin';
-  const [activeRoleView, setActiveRoleView] = useState(userRole);
-
-  // Sync state if user loads after mount
-  useEffect(() => {
-    if (user?.role) {
-      setActiveRoleView(user.role);
-    }
-  }, [user?.role]);
+  // The role is STRICTLY locked to the authenticated user's registered role in MongoDB
+  const role = user?.role || 'inventory_manager';
 
   const [data, setData] = useState(null);
   const [products, setProducts] = useState([]);
@@ -92,7 +83,7 @@ export const Dashboard = () => {
   };
 
   if (loading) {
-    return <Loading text="Loading role-specific operational workspace..." />;
+    return <Loading text="Loading your role workspace..." />;
   }
 
   if (error) {
@@ -125,22 +116,22 @@ export const Dashboard = () => {
       icon: Package,
     },
     warehouse_staff: {
-      title: 'Warehouse Floor Execution Terminal',
-      desc: 'Immediate receiving queue, order pick-and-dispatch bay, and inter-hub transfer loading tasks.',
+      title: 'Warehouse Floor Verification & Inspection Terminal',
+      desc: 'Floor verification station: Inspect inbound freight shipments, confirm outbound courier dispatches, and verify inter-hub transit movements.',
       color: '#fbbf24',
       label: 'Warehouse Staff',
       icon: Wrench,
     },
   };
 
-  const currentRoleConfig = roleMeta[activeRoleView] || roleMeta.admin;
+  const currentRoleConfig = roleMeta[role] || roleMeta.inventory_manager;
   const RoleIcon = currentRoleConfig.icon;
 
   return (
     <div>
-      {/* Role Header & Role Switcher */}
+      {/* Role Header */}
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
               <div
@@ -153,7 +144,7 @@ export const Dashboard = () => {
                   fontSize: '0.75rem',
                   fontWeight: 700,
                   textTransform: 'uppercase',
-                  background: `rgba(${activeRoleView === 'admin' ? '99, 102, 241' : activeRoleView === 'inventory_manager' ? '16, 185, 129' : '245, 158, 11'}, 0.15)`,
+                  background: `rgba(${role === 'admin' ? '99, 102, 241' : role === 'inventory_manager' ? '16, 185, 129' : '245, 158, 11'}, 0.15)`,
                   color: currentRoleConfig.color,
                   border: `1px solid ${currentRoleConfig.color}`,
                 }}
@@ -162,7 +153,7 @@ export const Dashboard = () => {
                 <span>{currentRoleConfig.label} Workspace</span>
               </div>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                User: <strong style={{ color: '#fff' }}>{user?.name || 'Authorized Member'}</strong>
+                User: <strong style={{ color: '#fff' }}>{user?.name || 'Authorized Member'}</strong> ({user?.email})
               </span>
             </div>
 
@@ -186,90 +177,10 @@ export const Dashboard = () => {
             </button>
           </div>
         </div>
-
-        {/* Role View Tabs (Automatic by role, with preview switcher) */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            padding: '6px',
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            width: 'fit-content',
-            flexWrap: 'wrap',
-          }}
-        >
-          <button
-            onClick={() => setActiveRoleView('admin')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.825rem',
-              fontWeight: activeRoleView === 'admin' ? 700 : 500,
-              background: activeRoleView === 'admin' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
-              color: activeRoleView === 'admin' ? '#fff' : 'var(--text-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <ShieldCheck size={14} />
-            <span>Administrator View</span>
-            {user?.role === 'admin' && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>(Your Role)</span>}
-          </button>
-
-          <button
-            onClick={() => setActiveRoleView('inventory_manager')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.825rem',
-              fontWeight: activeRoleView === 'inventory_manager' ? 700 : 500,
-              background: activeRoleView === 'inventory_manager' ? 'linear-gradient(135deg, #10b981, #059669)' : 'transparent',
-              color: activeRoleView === 'inventory_manager' ? '#fff' : 'var(--text-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <Package size={14} />
-            <span>Inventory Manager View</span>
-            {user?.role === 'inventory_manager' && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>(Your Role)</span>}
-          </button>
-
-          <button
-            onClick={() => setActiveRoleView('warehouse_staff')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.825rem',
-              fontWeight: activeRoleView === 'warehouse_staff' ? 700 : 500,
-              background: activeRoleView === 'warehouse_staff' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'transparent',
-              color: activeRoleView === 'warehouse_staff' ? '#fff' : 'var(--text-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <Wrench size={14} />
-            <span>Warehouse Staff View</span>
-            {user?.role === 'warehouse_staff' && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>(Your Role)</span>}
-          </button>
-        </div>
       </div>
 
-      {/* Role-Specific Dynamic Dashboard Component */}
-      {activeRoleView === 'admin' && (
+      {/* Role-Specific Dashboard: LOCKED strictly to user.role */}
+      {role === 'admin' && (
         <AdminDashboardView
           data={data}
           products={products}
@@ -280,7 +191,7 @@ export const Dashboard = () => {
         />
       )}
 
-      {activeRoleView === 'inventory_manager' && (
+      {role === 'inventory_manager' && (
         <ManagerDashboardView
           data={data}
           products={products}
@@ -290,14 +201,18 @@ export const Dashboard = () => {
         />
       )}
 
-      {activeRoleView === 'warehouse_staff' && (
+      {role === 'warehouse_staff' && (
         <StaffDashboardView
           receipts={receipts}
           deliveries={deliveries}
           transfers={transfers}
+          products={products}
+          warehouses={warehouses}
           onRefresh={handleRefresh}
         />
       )}
     </div>
   );
 };
+
+export default Dashboard;

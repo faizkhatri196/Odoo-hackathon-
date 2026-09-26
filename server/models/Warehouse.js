@@ -7,10 +7,14 @@ const warehouseSchema = new mongoose.Schema(
       required: [true, 'Warehouse name is required'],
       trim: true,
     },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      index: true,
+    },
     code: {
       type: String,
       required: [true, 'Warehouse short code is required'],
-      unique: true,
       uppercase: true,
       trim: true,
     },
@@ -36,5 +40,8 @@ const warehouseSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+warehouseSchema.index({ company: 1, code: 1 });
+warehouseSchema.index({ company: 1, isActive: 1 });
 
 module.exports = mongoose.model('Warehouse', warehouseSchema);
