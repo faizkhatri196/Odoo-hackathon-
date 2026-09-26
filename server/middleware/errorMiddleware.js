@@ -11,6 +11,9 @@ const errorHandler = (err, req, res, next) => {
   if (err.name === 'CastError' && err.kind === 'ObjectId') {
     statusCode = 404;
     message = 'Resource not found with specified ID';
+  } else if (err.message && err.message.includes('buffering timed out')) {
+    statusCode = 503;
+    message = 'Database connection timed out. Please verify your internet connection and MongoDB Atlas IP whitelist (Network Access -> Add 0.0.0.0/0).';
   }
 
   res.status(statusCode).json({

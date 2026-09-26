@@ -1,9 +1,17 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 const generateOTP = require('../utils/generateOTP');
 
 exports.signup = async (req, res, next) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database is currently not connected. Please verify your internet connection and MongoDB Atlas IP whitelist (0.0.0.0/0).',
+      });
+    }
+
     const { name, email, password, role, warehouse } = req.body;
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -45,6 +53,13 @@ exports.login = async (req, res, next) => {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Please provide email and password' });
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database is currently not connected. Please verify your internet connection and MongoDB Atlas IP whitelist (0.0.0.0/0).',
+      });
     }
 
     const user = await User.findOne({ email }).select('+password');

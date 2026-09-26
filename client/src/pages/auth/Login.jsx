@@ -18,7 +18,12 @@ export const Login = () => {
       await login({ email, password });
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please verify credentials.');
+      const msg = err.response?.data?.message || err.message || 'Login failed. Please verify credentials.';
+      if (msg.includes('buffering timed out') || msg.includes('timeout') || err.response?.status === 503) {
+        setError('Database connection unavailable or timed out. Please check that your network allows MongoDB Atlas and your IP is whitelisted (0.0.0.0/0).');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
