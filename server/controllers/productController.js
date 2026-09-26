@@ -1,73 +1,288 @@
 const Product = require('../models/Product');
+const Warehouse = require('../models/Warehouse');
+const Stock = require('../models/Stock');
+const StockLedger = require('../models/StockLedger');
+const StockService = require('../services/stockService');
+const { TRANSACTION_TYPES } = require('../utils/constants');
 
+/**
+ * Get products with search, category filter, stock status filter, and pagination
+ * GET /api/products
+ */
 exports.getProducts = async (req, res, next) => {
   try {
-    const { search, category, page = 1, limit = 20 } = req.query;
+    const {
+      search,
+      category,
+      status,
+      stockStatus,
+      warehouse,
+      warehouseId,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
     const query = { isActive: true };
 
-    if (search) {
+    if (search && search.trim()) {
+      const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } },
+        { name: { $regex: escaped, $options: 'i' } },
+        { sku: { $regex: escaped, $options: 'i' } },
       ];
     }
-    if (category) query.category = category;
 
-    const skip = (page - 1) * limit;
+    if (category) {
+      query.category = category;
+    }
+
+    const wId = warehouse || warehouseId;
+    if (wId) {
+      query['warehouseStock.warehouse'] = wId;
+    }
+
+    const statusFilter = (stockStatus || status || '').toUpperCase();
+    if (statusFilter === 'OUT_OF_STOCK') {
+      query.totalQuantity = { $lte: 0 };
+    } else if (statusFilter === 'LOW_STOCK') {
+      query.$expr = {
+        $and: [
+          { $gt: ['$totalQuantity', 0] },
+          { $gt: ['$minReorderLevel', 0] },
+          { $lte: ['$totalQuantity', '$minReorderLevel'] },
+        ],
+      };
+    } else if (statusFilter === 'IN_STOCK') {
+      query.$expr = {
+        $or: [
+          { $gt: ['$totalQuantity', '$minReorderLevel'] },
+          { $and: [{ $gt: ['$totalQuantity', 0] }, { $eq: ['$minReorderLevel', 0] }] },
+        ],
+      };
+    }
+
+    const p = Math.max(1, parseInt(page, 10) || 1);
+    const l = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const skip = (p - 1) * l;
+
     const [products, total] = await Promise.all([
       Product.find(query)
         .populate('warehouseStock.warehouse', 'name code')
+        .populate('categoryId', 'name code')
         .skip(skip)
-        .limit(Number(limit))
+        .limit(l)
         .sort({ createdAt: -1 }),
       Product.countDocuments(query),
     ]);
 
+    // Attach calculated stock status
+    const data = products.map((prod) => {
+      const obj = prod.toObject();
+      obj.stockStatus = StockService.calculateStockStatus(prod.totalQuantity, prod.minReorderLevel);
+      return obj;
+    });
+
     res.json({
       success: true,
-      data: products,
-      pagination: { total, page: Number(page), pages: Math.ceil(total / limit) },
+      data,
+      pagination: {
+        total,
+        page: p,
+        pages: Math.ceil(total / l),
+        limit: l,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Get product by ID
+ * GET /api/products/:id
+ */
 exports.getProductById = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id).populate(
-      'warehouseStock.warehouse',
-      'name code location'
-    );
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
-    res.json({ success: true, data: product });
+    const product = await Product.findById(req.params.id)
+      .populate('warehouseStock.warehouse', 'name code location')
+      .populate('categoryId', 'name code');
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    const summary = await StockService.getProductStockSummary(req.params.id);
+
+    res.json({
+      success: true,
+      data: {
+        ...product.toObject(),
+        stockSummary: summary,
+      },
+    });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Create a new product with optional initial stock
+ * POST /api/products
+ */
 exports.createProduct = async (req, res, next) => {
   try {
-    const product = await Product.create(req.body);
-    res.status(201).json({ success: true, data: product });
+    const {
+      name,
+      sku,
+      barcode,
+      category,
+      categoryId,
+      description,
+      unitOfMeasure,
+      costPrice,
+      sellingPrice,
+      initialStock,
+      warehouseId,
+      warehouse,
+      locationId,
+      locationRack,
+      minReorderLevel,
+      reorderPoint,
+    } = req.body;
+
+    const normalizedSku = (sku || '').trim().toUpperCase();
+    if (!normalizedSku) {
+      return res.status(400).json({ success: false, message: 'SKU is required' });
+    }
+
+    // Check duplicate SKU
+    const existing = await Product.findOne({ sku: normalizedSku });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        code: 'DUPLICATE_SKU',
+        message: `SKU "${normalizedSku}" already exists`,
+      });
+    }
+
+    const initialQty = Number(initialStock) || 0;
+    if (initialQty < 0) {
+      return res.status(400).json({ success: false, message: 'Initial stock cannot be negative' });
+    }
+
+    // Create product
+    const product = new Product({
+      name: (name || '').trim(),
+      sku: normalizedSku,
+      barcode: (barcode || '').trim(),
+      category: category || 'General',
+      categoryId: categoryId || null,
+      description: description || '',
+      unitOfMeasure: unitOfMeasure || 'Units',
+      costPrice: Number(costPrice) || 0,
+      sellingPrice: Number(sellingPrice) || 0,
+      totalQuantity: 0,
+      initialStock: initialQty,
+      minReorderLevel: Number(minReorderLevel ?? reorderPoint ?? 10),
+      warehouseStock: [],
+      isActive: true,
+    });
+
+    await product.save();
+
+    let targetWarehouse = warehouseId || warehouse;
+    if (initialQty > 0) {
+      // If no warehouse specified, select the first available active warehouse
+      if (!targetWarehouse) {
+        const defaultWH = await Warehouse.findOne({ isActive: true });
+        if (defaultWH) {
+          targetWarehouse = defaultWH._id;
+        }
+      }
+
+      if (targetWarehouse) {
+        await StockService.adjustProductStock({
+          productId: product._id,
+          warehouseId: targetWarehouse,
+          locationId: locationId || null,
+          locationRack: locationRack || 'A-01',
+          quantityDelta: initialQty,
+          transactionType: TRANSACTION_TYPES.INITIAL_STOCK,
+          referenceId: product._id,
+          referenceNumber: `INIT-${product.sku}`,
+          unitCost: product.costPrice,
+          performedBy: req.user?._id || null,
+          notes: 'Initial stock recorded on product creation',
+        });
+      }
+    }
+
+    // Refresh updated product
+    const updated = await Product.findById(product._id).populate('warehouseStock.warehouse', 'name code');
+
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully',
+      data: updated,
+    });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Update product metadata
+ * CRITICAL RULE: Prevent direct stock updates!
+ * PUT /api/products/:id
+ */
 exports.updateProduct = async (req, res, next) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    const updateData = { ...req.body };
+
+    // Disallow direct stock manipulation through product update
+    delete updateData.totalQuantity;
+    delete updateData.initialStock;
+    delete updateData.warehouseStock;
+
+    if (updateData.sku) {
+      updateData.sku = updateData.sku.trim().toUpperCase();
+      const existing = await Product.findOne({ sku: updateData.sku, _id: { $ne: req.params.id } });
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          code: 'DUPLICATE_SKU',
+          message: `SKU "${updateData.sku}" is already in use by another product`,
+        });
+      }
+    }
+
+    if (updateData.reorderPoint !== undefined && updateData.minReorderLevel === undefined) {
+      updateData.minReorderLevel = Number(updateData.reorderPoint);
+    }
+
+    const product = await Product.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
+    }).populate('warehouseStock.warehouse', 'name code');
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      data: product,
     });
-    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
-    res.json({ success: true, data: product });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * Deactivate / Soft delete product
+ * DELETE /api/products/:id
+ */
 exports.deleteProduct = async (req, res, next) => {
   try {
     const product = await Product.findByIdAndUpdate(
@@ -75,7 +290,78 @@ exports.deleteProduct = async (req, res, next) => {
       { isActive: false },
       { new: true }
     );
-    res.json({ success: true, message: 'Product deactivated successfully' });
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Product deactivated successfully',
+      data: product,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get product stock breakdown
+ * GET /api/products/:id/stock
+ */
+exports.getProductStock = async (req, res, next) => {
+  try {
+    const summary = await StockService.getProductStockSummary(req.params.id);
+    res.json({
+      success: true,
+      data: summary,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get product availability by location
+ * GET /api/products/:id/availability
+ */
+exports.getProductAvailability = async (req, res, next) => {
+  try {
+    const summary = await StockService.getProductStockSummary(req.params.id);
+    res.json({
+      success: true,
+      data: {
+        productId: summary.productId,
+        name: summary.name,
+        sku: summary.sku,
+        totalQuantity: summary.totalQuantity,
+        stockStatus: summary.stockStatus,
+        warehouses: summary.warehouseStock,
+        locations: summary.locationStock,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get ledger entries for a single product
+ * GET /api/products/:id/ledger
+ */
+exports.getProductLedger = async (req, res, next) => {
+  try {
+    const entries = await StockLedger.find({ product: req.params.id })
+      .populate('warehouse', 'name code')
+      .populate('performedBy', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      entries,
+      data: entries,
+      total: entries.length,
+    });
   } catch (error) {
     next(error);
   }
