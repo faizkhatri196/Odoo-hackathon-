@@ -1,63 +1,78 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
-import { StatCard } from '../../components/StatCard';
-import { DataTable } from '../../components/DataTable';
 import { Loading } from '../../components/Loading';
-import { EmptyState } from '../../components/EmptyState';
-import { StatusBadge } from '../../components/StatusBadge';
-import { DashboardFilters } from '../../components/DashboardFilters';
+import { useAuth } from '../../hooks/useAuth';
 import { dashboardService } from '../../services/dashboardService';
 import { productService } from '../../services/productService';
-import { formatCurrency, formatNumber } from '../../utils/formatNumber';
-import { formatDate } from '../../utils/formatDate';
+import { receiptService } from '../../services/receiptService';
+import { deliveryService } from '../../services/deliveryService';
+import { transferService } from '../../services/transferService';
+import { AdminDashboardView } from './views/AdminDashboardView';
+import { ManagerDashboardView } from './views/ManagerDashboardView';
+import { StaffDashboardView } from './views/StaffDashboardView';
 import {
-  Package,
-  AlertTriangle,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Repeat,
   RefreshCw,
-  Plus,
-  SlidersHorizontal,
-  ArrowRight,
-  Boxes,
+  ShieldCheck,
+  Package,
+  Wrench,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Role can be defaulted to the logged in user's role
+  const userRole = user?.role || 'admin';
+  const [activeRoleView, setActiveRoleView] = useState(userRole);
+
+  // Sync state if user loads after mount
+  useEffect(() => {
+    if (user?.role) {
+      setActiveRoleView(user.role);
+    }
+  }, [user?.role]);
 
   const [data, setData] = useState(null);
   const [products, setProducts] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [deliveries, setDeliveries] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Dynamic Filters State
-  const [filters, setFilters] = useState({
-    type: 'ALL',
-    status: 'ALL',
-    warehouse: 'ALL',
-    category: 'ALL',
-    search: '',
-  });
-
   const fetchDashboardData = async () => {
     setError(null);
     try {
-      const [dashRes, prodRes, whRes, catRes] = await Promise.all([
-        dashboardService.getDashboardMetrics(filters),
+      const [
+        dashRes,
+        prodRes,
+        whRes,
+        catRes,
+        recRes,
+        delRes,
+        trfRes,
+      ] = await Promise.all([
+        dashboardService.getDashboardMetrics(),
         productService.getProducts().catch(() => ({ data: [] })),
         dashboardService.getWarehouses(),
         dashboardService.getCategories(),
+        receiptService.getReceipts().catch(() => ({ data: [] })),
+        deliveryService.getDeliveries().catch(() => ({ data: [] })),
+        transferService.getTransfers().catch(() => ({ data: [] })),
       ]);
 
       setData(dashRes.data);
       setProducts(Array.isArray(prodRes.data) ? prodRes.data : []);
       setWarehouses(whRes.data || []);
       setCategories(catRes.data || []);
+      setReceipts(recRes.data || []);
+      setDeliveries(delRes.data || []);
+      setTransfers(trfRes.data || []);
     } catch (err) {
       console.error('Error fetching dashboard metrics:', err);
       setError('Unable to load warehouse operations from backend engine. Please verify connection.');
@@ -76,403 +91,213 @@ export const Dashboard = () => {
     fetchDashboardData();
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleResetFilters = () => {
-    setFilters({
-      type: 'ALL',
-      status: 'ALL',
-      warehouse: 'ALL',
-      category: 'ALL',
-      search: '',
-    });
-  };
-
-  // Compute Low Stock Items from Products list
-  const lowStockItems = useMemo(() => {
-    return products.filter((p) => (p.totalQuantity || 0) <= (p.minReorderLevel || 10));
-  }, [products]);
-
-  // Filter Recent Activities dynamically based on user controls
-  const filteredActivities = useMemo(() => {
-    if (!data?.recentActivities) return [];
-
-    return data.recentActivities.filter((act) => {
-      // Filter Document Type
-      if (filters.type !== 'ALL') {
-        const actType = (act.transactionType || '').toLowerCase();
-        if (filters.type === 'receipt' && !actType.includes('receipt')) return false;
-        if (filters.type === 'delivery' && !actType.includes('delivery')) return false;
-        if (filters.type === 'transfer' && !actType.includes('transfer')) return false;
-        if (filters.type === 'adjustment' && !actType.includes('adjustment')) return false;
-      }
-
-      // Filter Status
-      if (filters.status !== 'ALL') {
-        const actStatus = (act.status || 'done').toLowerCase();
-        if (actStatus !== filters.status.toLowerCase()) return false;
-      }
-
-      // Filter Warehouse
-      if (filters.warehouse !== 'ALL') {
-        const whVal = filters.warehouse.toLowerCase();
-        const whCode = (act.warehouse?.code || '').toLowerCase();
-        const whId = (act.warehouse?._id || act.warehouse?.id || '').toLowerCase();
-        const whName = (act.warehouse?.name || '').toLowerCase();
-        if (!whCode.includes(whVal) && !whId.includes(whVal) && !whName.includes(whVal)) {
-          return false;
-        }
-      }
-
-      // Filter Category
-      if (filters.category !== 'ALL') {
-        const catVal = filters.category.toLowerCase();
-        const prodCat = (act.product?.category || act.category || '').toLowerCase();
-        if (!prodCat.includes(catVal)) {
-          return false;
-        }
-      }
-
-      // Filter Search
-      if (filters.search) {
-        const query = filters.search.toLowerCase();
-        const prodName = (act.product?.name || '').toLowerCase();
-        const prodSku = (act.product?.sku || '').toLowerCase();
-        const ref = (act.referenceNumber || '').toLowerCase();
-        if (!prodName.includes(query) && !prodSku.includes(query) && !ref.includes(query)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [data, filters]);
-
   if (loading) {
-    return <Loading text="Aggregating warehouse stock counts and operations metrics..." />;
+    return <Loading text="Loading role-specific operational workspace..." />;
   }
 
   if (error) {
     return (
       <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', maxWidth: '600px', margin: '40px auto' }}>
         <AlertTriangle size={48} color="#f43f5e" style={{ marginBottom: '16px' }} />
-        <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '8px' }}>Backend Service Error</h3>
+        <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '8px' }}>Operational Service Offline</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>{error}</p>
         <button onClick={fetchDashboardData} className="btn-primary">
           <RefreshCw size={16} />
-          <span>Retry Loading Dashboard</span>
+          <span>Retry Connection</span>
         </button>
       </div>
     );
   }
 
-  const columns = [
-    {
-      header: 'Document Type',
-      render: (row) => {
-        const type = (row.transactionType || 'Movement').toLowerCase();
-        let badgeColor = 'blue';
-        let IconComp = Boxes;
+  const roleMeta = {
+    admin: {
+      title: 'Executive Operations Command Center',
+      desc: 'Enterprise multi-warehouse control, network valuation, master audit ledger, and facility monitoring.',
+      color: '#818cf8',
+      label: 'Administrator',
+      icon: ShieldCheck,
+    },
+    inventory_manager: {
+      title: 'Inventory Replenishment & Planning Center',
+      desc: 'Reorder safety thresholds, inbound supplier pipelines, outbound sales allocations, and stock accuracy.',
+      color: '#34d399',
+      label: 'Inventory Manager',
+      icon: Package,
+    },
+    warehouse_staff: {
+      title: 'Warehouse Floor Execution Terminal',
+      desc: 'Immediate receiving queue, order pick-and-dispatch bay, and inter-hub transfer loading tasks.',
+      color: '#fbbf24',
+      label: 'Warehouse Staff',
+      icon: Wrench,
+    },
+  };
 
-        if (type.includes('receipt') || type.includes('in')) {
-          badgeColor = 'emerald';
-          IconComp = ArrowDownLeft;
-        } else if (type.includes('delivery') || type.includes('out')) {
-          badgeColor = 'rose';
-          IconComp = ArrowUpRight;
-        } else if (type.includes('transfer')) {
-          badgeColor = 'amber';
-          IconComp = Repeat;
-        } else if (type.includes('adjustment')) {
-          badgeColor = 'purple';
-          IconComp = SlidersHorizontal;
-        }
-
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <IconComp size={16} color={`var(--accent-${badgeColor})`} />
-            <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>
-              {row.transactionType || 'Operation'}
-            </span>
-          </div>
-        );
-      },
-    },
-    {
-      header: 'Reference',
-      render: (row) => (
-        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#818cf8' }}>
-          {row.referenceNumber || `REF-${(row._id || '').slice(-6).toUpperCase()}`}
-        </span>
-      ),
-    },
-    {
-      header: 'Product',
-      render: (row) => (
-        <div>
-          <p style={{ fontWeight: 600, color: '#fff' }}>{row.product?.name || 'Stock Item'}</p>
-          {row.product?.sku && (
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>SKU: {row.product.sku}</p>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: 'Stock Delta',
-      render: (row) => {
-        const change = row.quantityChange || 0;
-        const isPositive = change > 0;
-        return (
-          <span
-            style={{
-              padding: '2px 8px',
-              borderRadius: '4px',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              background: isPositive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
-              color: isPositive ? '#34d399' : '#fb7185',
-              border: `1px solid ${isPositive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'}`,
-            }}
-          >
-            {isPositive ? `+${change}` : change}
-          </span>
-        );
-      },
-    },
-    {
-      header: 'Warehouse',
-      render: (row) => row.warehouse?.name || row.warehouse?.code || 'Main Central (WH-MAIN)',
-    },
-    {
-      header: 'Timestamp',
-      render: (row) => formatDate(row.createdAt || new Date()),
-    },
-  ];
+  const currentRoleConfig = roleMeta[activeRoleView] || roleMeta.admin;
+  const RoleIcon = currentRoleConfig.icon;
 
   return (
     <div>
-      {/* Header with Quick Actions */}
-      <PageHeader
-        title="StockSense Inventory Dashboard"
-        description="Real-time multi-warehouse stock monitoring, automated reorder tracking, and operational movement audit."
-        action={
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      {/* Role Header & Role Switcher */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  background: `rgba(${activeRoleView === 'admin' ? '99, 102, 241' : activeRoleView === 'inventory_manager' ? '16, 185, 129' : '245, 158, 11'}, 0.15)`,
+                  color: currentRoleConfig.color,
+                  border: `1px solid ${currentRoleConfig.color}`,
+                }}
+              >
+                <RoleIcon size={14} />
+                <span>{currentRoleConfig.label} Workspace</span>
+              </div>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                User: <strong style={{ color: '#fff' }}>{user?.name || 'Authorized Member'}</strong>
+              </span>
+            </div>
+
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+              {currentRoleConfig.title}
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: '6px 0 0 0' }}>
+              {currentRoleConfig.desc}
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button
               onClick={handleRefresh}
               className="btn-secondary"
               disabled={refreshing}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <RefreshCw size={16} className={refreshing ? 'spin-anim' : ''} />
-              <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-            </button>
-            <button
-              onClick={() => navigate('/receipts/new')}
-              className="btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Plus size={16} />
-              <span>New Receipt</span>
+              <RefreshCw size={15} className={refreshing ? 'spin-anim' : ''} />
+              <span>{refreshing ? 'Refreshing...' : 'Refresh Live Data'}</span>
             </button>
           </div>
-        }
-      />
+        </div>
 
-      {/* 5 KPI Cards Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: '16px',
-          marginBottom: '28px',
-        }}
-      >
-        <StatCard
-          title="Total Products in Stock"
-          subtitle={`Valuation: ${formatCurrency(data?.totalStockValuation || 0)}`}
-          value={formatNumber(data?.totalProducts || 0)}
-          icon={<Package size={20} />}
-          accent="primary"
-          onClick={() => navigate('/products')}
-        />
-        <StatCard
-          title="Low Stock / Out of Stock"
-          subtitle="Attention required"
-          value={formatNumber(data?.lowStockCount || lowStockItems.length)}
-          icon={<AlertTriangle size={20} />}
-          accent="rose"
-          onClick={() => {
-            const el = document.getElementById('low-stock-section');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }}
-        />
-        <StatCard
-          title="Pending Receipts"
-          subtitle="Inbound inventory"
-          value={formatNumber(data?.pendingReceipts || 0)}
-          icon={<ArrowDownLeft size={20} />}
-          accent="blue"
-          onClick={() => navigate('/receipts')}
-        />
-        <StatCard
-          title="Pending Deliveries"
-          subtitle="Outbound dispatches"
-          value={formatNumber(data?.pendingDeliveries || 0)}
-          icon={<ArrowUpRight size={20} />}
-          accent="amber"
-          onClick={() => navigate('/deliveries')}
-        />
-        <StatCard
-          title="Internal Transfers"
-          subtitle="Inter-warehouse moves"
-          value={formatNumber(data?.activeTransfers || 0)}
-          icon={<Repeat size={20} />}
-          accent="emerald"
-          onClick={() => navigate('/transfers')}
-        />
-      </div>
-
-      {/* Dynamic Filters Component */}
-      <DashboardFilters
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        onReset={handleResetFilters}
-        warehouses={warehouses}
-        categories={categories}
-      />
-
-      {/* Low Stock Warning Section */}
-      {lowStockItems.length > 0 && (
+        {/* Role View Tabs (Automatic by role, with preview switcher) */}
         <div
-          id="low-stock-section"
-          className="glass-panel"
           style={{
-            padding: '24px',
-            marginBottom: '28px',
-            borderColor: 'rgba(244, 63, 94, 0.3)',
-            background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(17, 24, 39, 0.8) 100%)',
+            display: 'flex',
+            gap: '8px',
+            padding: '6px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            width: 'fit-content',
+            flexWrap: 'wrap',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '16px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <AlertTriangle size={20} color="#fb7185" />
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-                Low Stock Reorder Alerts ({lowStockItems.length})
-              </h3>
-            </div>
-            <button
-              onClick={() => navigate('/products')}
-              className="btn-secondary"
-              style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-            >
-              <span>View All SKUs</span>
-              <ArrowRight size={14} />
-            </button>
-          </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '14px',
-            }}
-          >
-            {lowStockItems.slice(0, 4).map((item) => (
-              <div
-                key={item._id || item.sku}
-                style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  border: '1px solid rgba(244, 63, 94, 0.25)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#fff', margin: 0 }}>{item.name}</h4>
-                  <span
-                    style={{
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      background: 'rgba(244, 63, 94, 0.2)',
-                      color: '#fb7185',
-                    }}
-                  >
-                    SKU: {item.sku}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.825rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Stock: <strong style={{ color: '#fb7185' }}>{item.totalQuantity || 0} {item.uom || 'pcs'}</strong></span>
-                  <span style={{ color: 'var(--text-dim)' }}>Reorder at: {item.minReorderLevel || 10}</span>
-                </div>
-                <button
-                  onClick={() => navigate(`/receipts/new?product=${item._id}`)}
-                  className="btn-secondary"
-                  style={{
-                    marginTop: '4px',
-                    width: '100%',
-                    justifyContent: 'center',
-                    fontSize: '0.775rem',
-                    padding: '6px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    borderColor: 'rgba(99, 102, 241, 0.4)',
-                    color: '#818cf8',
-                  }}
-                >
-                  <Plus size={14} />
-                  <span>Create Restock Receipt</span>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Movements & Stock Ledger Table */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-            Recent Inventory Ledger Activity
-          </h3>
           <button
-            onClick={() => navigate('/ledger')}
-            className="btn-secondary"
-            style={{ fontSize: '0.8rem', padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            onClick={() => setActiveRoleView('admin')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '0.825rem',
+              fontWeight: activeRoleView === 'admin' ? 700 : 500,
+              background: activeRoleView === 'admin' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
+              color: activeRoleView === 'admin' ? '#fff' : 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
           >
-            <span>Full Move History</span>
-            <ArrowRight size={14} />
+            <ShieldCheck size={14} />
+            <span>Administrator View</span>
+            {user?.role === 'admin' && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>(Your Role)</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveRoleView('inventory_manager')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '0.825rem',
+              fontWeight: activeRoleView === 'inventory_manager' ? 700 : 500,
+              background: activeRoleView === 'inventory_manager' ? 'linear-gradient(135deg, #10b981, #059669)' : 'transparent',
+              color: activeRoleView === 'inventory_manager' ? '#fff' : 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Package size={14} />
+            <span>Inventory Manager View</span>
+            {user?.role === 'inventory_manager' && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>(Your Role)</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveRoleView('warehouse_staff')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '0.825rem',
+              fontWeight: activeRoleView === 'warehouse_staff' ? 700 : 500,
+              background: activeRoleView === 'warehouse_staff' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'transparent',
+              color: activeRoleView === 'warehouse_staff' ? '#fff' : 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Wrench size={14} />
+            <span>Warehouse Staff View</span>
+            {user?.role === 'warehouse_staff' && <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>(Your Role)</span>}
           </button>
         </div>
-
-        {filteredActivities.length === 0 ? (
-          <EmptyState
-            title="No inventory movements found"
-            description="No transaction logs match your active filter criteria. Try clearing search or resetting options."
-            action={
-              <button onClick={handleResetFilters} className="btn-secondary" style={{ marginTop: '12px' }}>
-                Reset All Filters
-              </button>
-            }
-          />
-        ) : (
-          <DataTable columns={columns} data={filteredActivities} />
-        )}
       </div>
+
+      {/* Role-Specific Dynamic Dashboard Component */}
+      {activeRoleView === 'admin' && (
+        <AdminDashboardView
+          data={data}
+          products={products}
+          warehouses={warehouses}
+          categories={categories}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+        />
+      )}
+
+      {activeRoleView === 'inventory_manager' && (
+        <ManagerDashboardView
+          data={data}
+          products={products}
+          receipts={receipts}
+          deliveries={deliveries}
+          transfers={transfers}
+        />
+      )}
+
+      {activeRoleView === 'warehouse_staff' && (
+        <StaffDashboardView
+          receipts={receipts}
+          deliveries={deliveries}
+          transfers={transfers}
+          onRefresh={handleRefresh}
+        />
+      )}
     </div>
   );
 };

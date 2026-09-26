@@ -172,44 +172,46 @@ export const Sidebar = ({ isOpen, onClose }) => {
             )}
           </div>
 
-          {/* Group Header: Settings */}
-          <div style={{ marginTop: '10px', marginBottom: '4px' }}>
-            <button
-              onClick={() => setSettingsExpanded(!settingsExpanded)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 12px',
-                background: 'transparent',
-                border: 'none',
-                color: isSettingsActive ? 'var(--primary)' : 'var(--text-dim)',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Settings size={14} />
-                <span>Settings</span>
-              </div>
-              {settingsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
+          {/* Group Header: Settings (Admin Only) */}
+          {user?.role === 'admin' && (
+            <div style={{ marginTop: '10px', marginBottom: '4px' }}>
+              <button
+                onClick={() => setSettingsExpanded(!settingsExpanded)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: isSettingsActive ? 'var(--primary)' : 'var(--text-dim)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Settings size={14} />
+                  <span>Settings</span>
+                </div>
+                {settingsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
 
-            {settingsExpanded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px', marginTop: '2px' }}>
-                <NavLink to="/settings/warehouse" style={activeLinkStyle} onClick={onClose}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Warehouse size={16} color="#38bdf8" />
-                    <span>Warehouse</span>
-                  </div>
-                </NavLink>
-              </div>
-            )}
-          </div>
+              {settingsExpanded && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px', marginTop: '2px' }}>
+                  <NavLink to="/settings/warehouse" style={activeLinkStyle} onClick={onClose}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Warehouse size={16} color="#38bdf8" />
+                      <span>Warehouse Facilities</span>
+                    </div>
+                  </NavLink>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Group Header: Profile */}
           <div style={{ marginTop: '10px' }}>
@@ -267,8 +269,14 @@ export const Sidebar = ({ isOpen, onClose }) => {
               <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user?.name || 'Inventory Manager'}
               </p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.role || 'Staff Member'}
+              <p style={{ fontSize: '0.75rem', color: '#818cf8', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.role === 'admin'
+                  ? 'Administrator'
+                  : user?.role === 'inventory_manager'
+                  ? 'Inventory Manager'
+                  : user?.role === 'warehouse_staff'
+                  ? 'Warehouse Staff'
+                  : user?.role || 'User'}
               </p>
             </div>
           </div>
