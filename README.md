@@ -120,7 +120,39 @@ sequenceDiagram
 | `GET`, `POST` | `/api/locations` | Sub-warehouse storage bins, racks, and production zones |
 | `GET`, `POST` | `/api/reorder-rules` | Automated min-max stock alert rules |
 
+### Operations & Auth (Member 4 — `/api/auth`, `/api/receipts`, `/api/deliveries`, `/api/transfers`, `/api/dashboard`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/signup` | Register new user with optional role/warehouse assignment | No |
+| `POST` | `/api/auth/login` | Authenticate user and receive JWT session token | No |
+| `POST` | `/api/auth/logout` | Session logout endpoint | No |
+| `POST` | `/api/auth/forgot-password` | Request password reset OTP | No |
+| `POST` | `/api/auth/reset-password` | Verify OTP and reset password | No |
+| `GET`  | `/api/auth/me` | Fetch authenticated user profile and permissions | Yes |
+| `GET`  | `/api/receipts` | List inbound supplier shipments with filters | Yes |
+| `POST` | `/api/receipts` | Create inbound receipt draft | Yes |
+| `GET`  | `/api/receipts/:id` | Get receipt order details | Yes |
+| `PUT`  | `/api/receipts/:id` | Update draft receipt order | Yes |
+| `POST` | `/api/receipts/:id/validate` | Validate receipt, increase stock via StockEngine, log ledger | Yes |
+| `GET`  | `/api/deliveries` | List outbound customer deliveries | Yes |
+| `POST` | `/api/deliveries` | Create outbound delivery order draft | Yes |
+| `GET`  | `/api/deliveries/:id` | Get delivery order details | Yes |
+| `PUT`  | `/api/deliveries/:id` | Update draft delivery order | Yes |
+| `POST` | `/api/deliveries/:id/validate` | Pre-check stock, deduct inventory, log ledger | Yes |
+| `GET`  | `/api/transfers` | List inter-warehouse transfers | Yes |
+| `POST` | `/api/transfers` | Create transfer request between warehouses | Yes |
+| `GET`  | `/api/transfers/:id` | Get transfer details | Yes |
+| `PUT`  | `/api/transfers/:id` | Update draft transfer request | Yes |
+| `POST` | `/api/transfers/:id/validate` | Relocate stock atomically preserving total invariant | Yes |
+| `GET`  | `/api/dashboard` | Main dashboard analytics with dynamic filters | Yes |
+| `GET`  | `/api/dashboard/summary` | High-level KPI summary metrics | Yes |
+| `GET`  | `/api/dashboard/low-stock` | Products below min reorder thresholds | Yes |
+| `GET`  | `/api/dashboard/pending-receipts` | Inbound orders awaiting validation | Yes |
+| `GET`  | `/api/dashboard/pending-deliveries` | Outbound orders awaiting dispatch | Yes |
+| `GET`  | `/api/dashboard/transfers` | Active inter-warehouse transfers | Yes |
+
 ---
+
 
 ## 🚀 Quick Start Guide
 
