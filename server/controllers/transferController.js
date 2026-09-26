@@ -1,5 +1,6 @@
 const Transfer = require('../models/Transfer');
 const Product = require('../models/Product');
+const Warehouse = require('../models/Warehouse');
 const StockService = require('../services/stockService');
 const { DOCUMENT_STATUS } = require('../utils/constants');
 
@@ -52,7 +53,7 @@ exports.getTransferById = async (req, res, next) => {
 
 exports.createTransfer = async (req, res, next) => {
   try {
-    const { fromWarehouse, toWarehouse, items } = req.body;
+    const { fromWarehouse, toWarehouse, items, scheduledDate, notes } = req.body;
 
     if (!fromWarehouse || !toWarehouse) {
       return res.status(400).json({
@@ -75,13 +76,22 @@ exports.createTransfer = async (req, res, next) => {
       quantity: Number(it.quantity) || 1,
     }));
 
+    if (validatedItems.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one product item is required for transfer',
+      });
+    }
+
     const transfer = await Transfer.create({
-      ...req.body,
       transferNumber,
       fromWarehouse,
       toWarehouse,
       items: validatedItems,
-      createdBy: req.user._id,
+      scheduledDate: scheduledDate || new Date(),
+      notes: notes || '',
+      status: DOCUMENT_STATUS.DRAFT,
+      createdBy: req.user?._id || null,
     });
 
     const populatedTransfer = await Transfer.findById(transfer._id)
@@ -173,7 +183,10 @@ exports.updateTransfer = async (req, res, next) => {
 
 exports.validateTransfer = async (req, res, next) => {
   try {
-    const transfer = await Transfer.findById(req.params.id);
+    const transfer = await Transfer.findById(req.params.id)
+      .populate('fromWarehouse', 'name code')
+      .populate('toWarehouse', 'name code');
+
     if (!transfer) {
       return res.status(404).json({ success: false, message: 'Transfer not found' });
     }
@@ -193,40 +206,20 @@ exports.validateTransfer = async (req, res, next) => {
       });
     }
 
-    // Step 1: Pre-check stock at source warehouse
+    // Perform atomic transfer through Member 3 central Stock Engine (guarantees invariant & atomic rollback)
     for (const item of transfer.items) {
-      const product = await Product.findById(item.product);
-      if (!product) {
-        return res.status(404).json({
-          success: false,
-          message: `Product ${item.product} not found in catalog`,
-        });
-      }
+      const qty = Number(item.quantity);
+      if (qty <= 0) continue;
 
-      const sourceStock = product.warehouseStock.find(
-        (ws) => ws.warehouse.toString() === transfer.fromWarehouse.toString()
-      );
-      const available = sourceStock ? sourceStock.quantity : 0;
-
-      if (available < item.quantity) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock at source warehouse for SKU ${product.sku} (${product.name}). Available: ${available}, Requested: ${item.quantity}`,
-        });
-      }
-    }
-
-    // Step 2: Perform atomic transfer through Member 3 central Stock Engine
-    for (const item of transfer.items) {
       await StockService.transferStock({
         productId: item.product,
-        fromWarehouseId: transfer.fromWarehouse,
-        toWarehouseId: transfer.toWarehouse,
-        quantity: item.quantity,
+        fromWarehouseId: transfer.fromWarehouse._id || transfer.fromWarehouse,
+        toWarehouseId: transfer.toWarehouse._id || transfer.toWarehouse,
+        quantity: qty,
         referenceId: transfer._id,
         referenceNumber: transfer.transferNumber,
-        performedBy: req.user._id,
-        notes: `Internal transfer ${transfer.transferNumber}`,
+        performedBy: req.user?._id || null,
+        notes: transfer.notes || `Inter-warehouse transfer ${transfer.transferNumber}`,
       });
     }
 
@@ -254,4 +247,3 @@ exports.validateTransfer = async (req, res, next) => {
     next(error);
   }
 };
-

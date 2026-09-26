@@ -11,6 +11,8 @@
     "start": "node server/server.js",
     "seed": "node server/scripts/seed.js",
     "test": "node server/scripts/test-stock-engine.js",
+    "test:demo": "node server/scripts/test-e2e-demo-flow.js",
+    "test:all": "node server/scripts/test-stock-engine.js && node server/scripts/test-e2e-demo-flow.js",
     "client:build": "npm --prefix client run build"
   },
   "keywords": [

@@ -112,13 +112,26 @@ sequenceDiagram
 | `POST`| `/api/stock/decrease` | Delivery helper for outbound order fulfillment | Yes |
 | `GET` | `/api/stock/ledger` | Comprehensive double-entry audit history | Yes |
 
-### Configurations (`/api/categories`, `/api/locations`, `/api/warehouses`, `/api/reorder-rules`)
+### Operational Endpoints (`/api/receipts`, `/api/deliveries`, `/api/transfers`, `/api/adjustments`)
+| Method | Endpoint | Description | Engine Method |
+| :--- | :--- | :--- | :--- |
+| `GET`, `POST` | `/api/receipts` | Inbound supplier shipments | `StockService.increaseStock` |
+| `POST` | `/api/receipts/:id/validate` | Receive stock into warehouse & append ledger | `StockService.increaseStock` |
+| `GET`, `POST` | `/api/deliveries` | Outbound customer sales orders | `StockService.decreaseStock` |
+| `POST` | `/api/deliveries/:id/validate` | Dispatch goods & deduct stock safely | `StockService.decreaseStock` |
+| `GET`, `POST` | `/api/transfers` | Internal inter-facility relocations | `StockService.transferStock` |
+| `POST` | `/api/transfers/:id/validate` | Execute atomic transfer with rollback protection | `StockService.transferStock` |
+| `GET`, `POST` | `/api/adjustments` | Physical count discrepancy reconciliation | `StockService.adjustStock` |
+| `POST` | `/api/adjustments/:id/apply` | Reconcile physical count and write audit | `StockService.adjustStock` |
+
+### Configurations (`/api/categories`, `/api/locations`, `/api/warehouses`, `/api/reorder-rules`, `/api/ledger`)
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET`, `POST` | `/api/categories` | Manage product classifications |
 | `GET`, `POST` | `/api/warehouses` | Multi-warehouse master records |
 | `GET`, `POST` | `/api/locations` | Sub-warehouse storage bins, racks, and production zones |
 | `GET`, `POST` | `/api/reorder-rules` | Automated min-max stock alert rules |
+| `GET` | `/api/ledger` | Double-entry append-only immutable audit trail |
 
 ### Operations & Auth (Member 4 — `/api/auth`, `/api/receipts`, `/api/deliveries`, `/api/transfers`, `/api/dashboard`)
 | Method | Endpoint | Description | Auth Required |
@@ -177,18 +190,29 @@ Install dependencies across both client and server:
 npm run install:all
 ```
 
-### 4. Database Seeding & Verification
-Populate demo warehouses, locations, categories, and products with initial ledger entries:
-```bash
-npm run seed
-```
-
-Run the automated Stock Engine verification suite:
+### 4. Automated Verification & Testing
+Run the stock engine unit and regression suite:
 ```bash
 npm test
 ```
 
-### 5. Start Development Servers
+Run the complete realistic End-to-End Demo Flow (`STEEL-001` full lifecycle):
+```bash
+npm run test:demo
+```
+
+Run both test suites:
+```bash
+npm run test:all
+```
+
+### 5. Production Build
+Verify client production bundle compilation:
+```bash
+npm run client:build
+```
+
+### 6. Start Development Servers
 Run frontend and backend simultaneously:
 ```bash
 npm run dev
@@ -201,23 +225,23 @@ npm run dev
 
 ## 👥 Default Demo Credentials
 
-| Role | Email | Password |
-| :--- | :--- | :--- |
-| **System Administrator** | `admin@stocksense.com` | `password123` |
-| **Inventory Manager** | `manager@stocksense.com` | `password123` |
-| **Warehouse Staff** | `staff@stocksense.com` | `password123` |
+| Role | Email | Password | Access Level |
+| :--- | :--- | :--- | :--- |
+| **System Administrator** | `admin@stocksense.com` | `password123` | Full Administrative & Operations Access |
+| **Inventory Manager** | `manager@stocksense.com` | `password123` | Master Catalogs, Operations & Adjustments |
+| **Warehouse Staff** | `staff@stocksense.com` | `password123` | Receipts, Deliveries & Stock Lookups |
 
 ---
 
-## 🧪 Automated Test Verification
+## 🧪 Verified Demo Flow: Lifecycle of Product `STEEL-001`
 
-| Test Scenario | Condition Tested | Result |
-| :--- | :--- | :---: |
-| **Product Initial Stock** | Product created with 100 units $\to$ Ledger entry +100 created | ✅ PASS |
-| **Duplicate SKU Rejection** | Re-creating identical SKU throws duplicate error | ✅ PASS |
-| **Receipt Stock Invariant** | Inbound +50 increases on-hand stock from 100 $\to$ 150 | ✅ PASS |
-| **Transfer Total Invariant**| 30 units transferred between locations $\to$ Total stock stays 150 | ✅ PASS |
-| **Negative Stock Prevention**| Delivery exceeding on-hand stock rejected with `INSUFFICIENT_STOCK` | ✅ PASS |
-| **Physical Adjustment** | Physical count 117 reconciles -3 difference $\to$ 127 total stock | ✅ PASS |
-| **Audit Ledger Immutability**| Direct mutation or deletion of `StockLedger` throws runtime error | ✅ PASS |
-| **Stock Status Calculation** | Correct evaluation of `OUT_OF_STOCK`, `LOW_STOCK`, `IN_STOCK` | ✅ PASS |
+| Step | Operation | Source Facility | Dest Facility | Quantity Change | Stock Result | Ledger Action |
+| :---: | :--- | :--- | :--- | :---: | :---: | :--- |
+| **1** | **Product Creation** | Main Warehouse | — | $+100$ | **$100$** | `INITIAL_STOCK +100` |
+| **2** | **Inbound Receipt** | Main Warehouse | — | $+50$ | **$150$** | `RECEIPT +50` |
+| **3** | **Internal Transfer**| Main Warehouse | Ahmedabad WH | $30 \to$ | **$150$** ($120 + 30$) | `TRANSFER_OUT -30` & `TRANSFER_IN +30` |
+| **4** | **Outbound Delivery**| Main Warehouse | — | $-20$ | **$130$** ($100 + 30$) | `DELIVERY -20` |
+| **5** | **Physical Audit** | Main Warehouse | — | $-3$ (Count: 127) | **$127$** ($97 + 30$) | `ADJUSTMENT -3` |
+| **6** | **Ledger Audit** | — | — | — | **$127$** | **6 Immutable Records Verified** |
+
+> **Invariant Check**: Total Stock Across All Facilities ($97 + 30 = 127$) $\equiv$ Product Master Quantity ($127$). Transfer preserved total company stock with zero loss. Insufficient stock was strictly rejected.

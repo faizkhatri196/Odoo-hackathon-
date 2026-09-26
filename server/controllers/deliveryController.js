@@ -54,22 +54,26 @@ exports.getDeliveryById = async (req, res, next) => {
 exports.createDelivery = async (req, res, next) => {
   try {
     const deliveryNumber = req.body.deliveryNumber || `DEL-${Date.now().toString().slice(-6)}`;
+    let { customer, warehouse, items = [], scheduledDate, notes } = req.body;
 
-    // Resolve warehouse: explicit body -> user assigned -> default active warehouse
-    let warehouseId = req.body.warehouse || (req.user && req.user.warehouse);
-    if (!warehouseId) {
-      const defaultWarehouse = await Warehouse.findOne({ isActive: true });
-      if (defaultWarehouse) warehouseId = defaultWarehouse._id;
+    let normalizedCustomer = customer;
+    if (typeof customer === 'string') {
+      normalizedCustomer = { name: customer.trim() || 'Customer' };
+    } else if (!customer || !customer.name) {
+      normalizedCustomer = { name: 'Customer' };
     }
 
-    if (!warehouseId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Warehouse is required. Please specify a warehouse.',
-      });
+    let targetWarehouse = warehouse || (req.user && req.user.warehouse);
+    if (!targetWarehouse) {
+      const defaultWh = await Warehouse.findOne({ isActive: true });
+      if (defaultWh) targetWarehouse = defaultWh._id;
     }
 
-    const items = (req.body.items || []).map((it) => {
+    if (!targetWarehouse) {
+      return res.status(400).json({ success: false, message: 'Warehouse is required for delivery creation' });
+    }
+
+    const formattedItems = (items || []).map((it) => {
       const demandedQty = Number(it.demandedQty) || 1;
       const deliveredQty = Number(it.deliveredQty) || 0;
       const unitPrice = Number(it.unitPrice) || 0;
@@ -82,15 +86,18 @@ exports.createDelivery = async (req, res, next) => {
       };
     });
 
-    const totalAmount = items.reduce((sum, it) => sum + (it.subtotal || 0), 0);
+    const totalAmount = formattedItems.reduce((sum, it) => sum + (it.subtotal || 0), 0);
 
     const delivery = await Delivery.create({
-      ...req.body,
       deliveryNumber,
-      warehouse: warehouseId,
-      items,
+      customer: normalizedCustomer,
+      warehouse: targetWarehouse,
+      items: formattedItems,
       totalAmount,
-      createdBy: req.user._id,
+      scheduledDate: scheduledDate || new Date(),
+      notes: notes || '',
+      status: DOCUMENT_STATUS.DRAFT,
+      createdBy: req.user?._id || null,
     });
 
     const populatedDelivery = await Delivery.findById(delivery._id)
@@ -129,7 +136,9 @@ exports.updateDelivery = async (req, res, next) => {
     }
 
     const { customer, warehouse, items, scheduledDate, notes, status } = req.body;
-    if (customer) delivery.customer = { ...delivery.customer, ...customer };
+    if (customer) {
+      delivery.customer = typeof customer === 'string' ? { name: customer } : { ...delivery.customer, ...customer };
+    }
     if (warehouse) delivery.warehouse = warehouse;
     if (scheduledDate) delivery.scheduledDate = scheduledDate;
     if (notes !== undefined) delivery.notes = notes;
@@ -199,33 +208,11 @@ exports.validateDelivery = async (req, res, next) => {
       });
     }
 
-    // Step 1: Pre-check stock availability for all products to prevent partial deductions
+    // Deduct stock safely through Member 3 central Stock Engine (auto-validates availability)
     for (const item of delivery.items) {
       const qty = item.deliveredQty > 0 ? item.deliveredQty : item.demandedQty;
-      const product = await Product.findById(item.product);
-      if (!product) {
-        return res.status(404).json({
-          success: false,
-          message: `Product ${item.product} not found in catalog`,
-        });
-      }
+      if (qty <= 0) continue;
 
-      const warehouseStock = product.warehouseStock.find(
-        (ws) => ws.warehouse.toString() === delivery.warehouse.toString()
-      );
-      const available = warehouseStock ? warehouseStock.quantity : 0;
-
-      if (available < qty) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for SKU ${product.sku} (${product.name}). Available: ${available}, Demanded: ${qty}`,
-        });
-      }
-    }
-
-    // Step 2: Apply stock reduction through Member 3 central Stock Engine
-    for (const item of delivery.items) {
-      const qty = item.deliveredQty > 0 ? item.deliveredQty : item.demandedQty;
       item.deliveredQty = qty;
       item.subtotal = qty * (item.unitPrice || 0);
 
@@ -237,7 +224,7 @@ exports.validateDelivery = async (req, res, next) => {
         referenceId: delivery._id,
         referenceNumber: delivery.deliveryNumber,
         unitCost: item.unitPrice || 0,
-        performedBy: req.user._id,
+        performedBy: req.user?._id || null,
         notes: `Outbound delivery ${delivery.deliveryNumber} to ${delivery.customer?.name || 'Customer'}`,
       });
     }
@@ -266,4 +253,3 @@ exports.validateDelivery = async (req, res, next) => {
     next(error);
   }
 };
-

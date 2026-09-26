@@ -30,3 +30,6 @@ logs/
 # IDE
 .vscode/
 .idea/
+
+# Vite temporary files
+*.timestamp-*.mjs

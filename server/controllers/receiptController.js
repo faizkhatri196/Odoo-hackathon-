@@ -53,22 +53,28 @@ exports.getReceiptById = async (req, res, next) => {
 exports.createReceipt = async (req, res, next) => {
   try {
     const receiptNumber = req.body.receiptNumber || `REC-${Date.now().toString().slice(-6)}`;
+    let { supplier, warehouse, items = [], scheduledDate, notes } = req.body;
+
+    // Normalize supplier if provided as string
+    let normalizedSupplier = supplier;
+    if (typeof supplier === 'string') {
+      normalizedSupplier = { name: supplier.trim() || 'Supplier' };
+    } else if (!supplier || !supplier.name) {
+      normalizedSupplier = { name: 'Supplier' };
+    }
 
     // Resolve warehouse: explicit body -> user assigned -> default active warehouse
-    let warehouseId = req.body.warehouse || (req.user && req.user.warehouse);
-    if (!warehouseId) {
-      const defaultWarehouse = await Warehouse.findOne({ isActive: true });
-      if (defaultWarehouse) warehouseId = defaultWarehouse._id;
+    let targetWarehouse = warehouse || (req.user && req.user.warehouse);
+    if (!targetWarehouse) {
+      const defaultWh = await Warehouse.findOne({ isActive: true });
+      if (defaultWh) targetWarehouse = defaultWh._id;
     }
 
-    if (!warehouseId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Warehouse is required. Please specify a warehouse.',
-      });
+    if (!targetWarehouse) {
+      return res.status(400).json({ success: false, message: 'Warehouse is required for receipt creation' });
     }
 
-    const items = (req.body.items || []).map((it) => {
+    const formattedItems = (items || []).map((it) => {
       const orderedQty = Number(it.orderedQty) || 1;
       const receivedQty = Number(it.receivedQty) || 0;
       const unitCost = Number(it.unitCost) || 0;
@@ -81,15 +87,18 @@ exports.createReceipt = async (req, res, next) => {
       };
     });
 
-    const totalAmount = items.reduce((sum, it) => sum + (it.subtotal || 0), 0);
+    const totalAmount = formattedItems.reduce((sum, it) => sum + (it.subtotal || 0), 0);
 
     const receipt = await Receipt.create({
-      ...req.body,
       receiptNumber,
-      warehouse: warehouseId,
-      items,
+      supplier: normalizedSupplier,
+      warehouse: targetWarehouse,
+      items: formattedItems,
       totalAmount,
-      createdBy: req.user._id,
+      scheduledDate: scheduledDate || new Date(),
+      notes: notes || '',
+      status: DOCUMENT_STATUS.DRAFT,
+      createdBy: req.user?._id || null,
     });
 
     const populatedReceipt = await Receipt.findById(receipt._id)
@@ -128,7 +137,9 @@ exports.updateReceipt = async (req, res, next) => {
     }
 
     const { supplier, warehouse, items, scheduledDate, notes, status } = req.body;
-    if (supplier) receipt.supplier = { ...receipt.supplier, ...supplier };
+    if (supplier) {
+      receipt.supplier = typeof supplier === 'string' ? { name: supplier } : { ...receipt.supplier, ...supplier };
+    }
     if (warehouse) receipt.warehouse = warehouse;
     if (scheduledDate) receipt.scheduledDate = scheduledDate;
     if (notes !== undefined) receipt.notes = notes;
@@ -198,9 +209,11 @@ exports.validateReceipt = async (req, res, next) => {
       });
     }
 
-    // Apply stock increase through Member 3 central Stock Engine
+    // Apply stock delta to each product via StockService.increaseStock
     for (const item of receipt.items) {
       const qty = item.receivedQty > 0 ? item.receivedQty : item.orderedQty;
+      if (qty <= 0) continue;
+
       item.receivedQty = qty;
       item.subtotal = qty * (item.unitCost || 0);
 
@@ -212,7 +225,7 @@ exports.validateReceipt = async (req, res, next) => {
         referenceId: receipt._id,
         referenceNumber: receipt.receiptNumber,
         unitCost: item.unitCost || 0,
-        performedBy: req.user._id,
+        performedBy: req.user?._id || null,
         notes: `Inbound receipt ${receipt.receiptNumber} from ${receipt.supplier?.name || 'Supplier'}`,
       });
     }
@@ -235,4 +248,3 @@ exports.validateReceipt = async (req, res, next) => {
     next(error);
   }
 };
-
