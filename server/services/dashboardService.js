@@ -5,7 +5,21 @@ const Transfer = require('../models/Transfer');
 const StockLedger = require('../models/StockLedger');
 
 class DashboardService {
-  static async getSummaryMetrics() {
+  static async getSummaryMetrics(query = {}) {
+    const activityFilter = {};
+
+    if (query.type && query.type !== 'ALL') {
+      activityFilter.transactionType = { $regex: query.type, $options: 'i' };
+    }
+
+    if (query.status && query.status !== 'ALL') {
+      activityFilter.status = query.status;
+    }
+
+    if (query.warehouse && query.warehouse !== 'ALL') {
+      activityFilter.warehouse = query.warehouse;
+    }
+
     const [
       totalProducts,
       productsList,
@@ -15,15 +29,15 @@ class DashboardService {
       recentActivities,
     ] = await Promise.all([
       Product.countDocuments({ isActive: true }),
-      Product.find({ isActive: true }).select('totalQuantity costPrice minReorderLevel'),
+      Product.find({ isActive: true }).select('totalQuantity costPrice minReorderLevel category'),
       Receipt.countDocuments({ status: { $in: ['draft', 'waiting', 'ready'] } }),
       Delivery.countDocuments({ status: { $in: ['draft', 'waiting', 'ready'] } }),
       Transfer.countDocuments({ status: { $in: ['draft', 'in-transit'] } }),
-      StockLedger.find()
-        .populate('product', 'name sku')
+      StockLedger.find(activityFilter)
+        .populate('product', 'name sku category')
         .populate('warehouse', 'name code')
         .sort({ createdAt: -1 })
-        .limit(8),
+        .limit(10),
     ]);
 
     let totalStockValuation = 0;

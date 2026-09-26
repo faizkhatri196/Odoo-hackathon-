@@ -115,6 +115,26 @@ export const Dashboard = () => {
         if (actStatus !== filters.status.toLowerCase()) return false;
       }
 
+      // Filter Warehouse
+      if (filters.warehouse !== 'ALL') {
+        const whVal = filters.warehouse.toLowerCase();
+        const whCode = (act.warehouse?.code || '').toLowerCase();
+        const whId = (act.warehouse?._id || act.warehouse?.id || '').toLowerCase();
+        const whName = (act.warehouse?.name || '').toLowerCase();
+        if (!whCode.includes(whVal) && !whId.includes(whVal) && !whName.includes(whVal)) {
+          return false;
+        }
+      }
+
+      // Filter Category
+      if (filters.category !== 'ALL') {
+        const catVal = filters.category.toLowerCase();
+        const prodCat = (act.product?.category || act.category || '').toLowerCase();
+        if (!prodCat.includes(catVal)) {
+          return false;
+        }
+      }
+
       // Filter Search
       if (filters.search) {
         const query = filters.search.toLowerCase();
