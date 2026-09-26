@@ -41,7 +41,7 @@ export const Profile = () => {
 
           <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '4px' }}>
-              <Calendar size={14} /> Member Since
+              <Calendar size={14} /> Member since
             </div>
             <p style={{ fontSize: '0.95rem', fontWeight: 600, color: '#fff' }}>Sept 2026</p>
           </div>
