@@ -36,15 +36,14 @@ const runSeed = async () => {
       ReorderRule.deleteMany({}),
     ]);
 
-    // 1. Create Default Users
+    // 1. Create Default Users (User model pre-save hook automatically hashes password)
     console.log('👤 Creating default users...');
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('password123', salt);
+    const demoPassword = 'password123';
 
     const admin = await User.create({
       name: 'Faiz Admin',
       email: 'admin@stocksense.com',
-      password: hashedPassword,
+      password: demoPassword,
       role: ROLES.ADMIN,
       isActive: true,
     });
@@ -52,7 +51,7 @@ const runSeed = async () => {
     const manager = await User.create({
       name: 'Inventory Manager',
       email: 'manager@stocksense.com',
-      password: hashedPassword,
+      password: demoPassword,
       role: ROLES.INVENTORY_MANAGER,
       isActive: true,
     });
@@ -60,7 +59,7 @@ const runSeed = async () => {
     const staff = await User.create({
       name: 'Warehouse Staff',
       email: 'staff@stocksense.com',
-      password: hashedPassword,
+      password: demoPassword,
       role: ROLES.WAREHOUSE_STAFF,
       isActive: true,
     });
