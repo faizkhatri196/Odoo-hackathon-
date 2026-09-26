@@ -118,6 +118,120 @@ class DashboardService {
       };
     }
   }
+
+  static async getLowStockProducts() {
+    const { isDbConnected } = require('../config/db');
+    if (!isDbConnected()) {
+      return [
+        {
+          _id: 'demo-prod-low-01',
+          name: 'High Precision Ball Bearings 10mm',
+          sku: 'BRG-10MM-01',
+          category: 'Hardware & Tools',
+          totalQuantity: 8,
+          minReorderLevel: 25,
+          unitOfMeasure: 'Units',
+          costPrice: 4.5,
+          sellingPrice: 8.0,
+          warehouseStock: [{ warehouse: { name: 'Main Central Warehouse', code: 'WH-MAIN' }, quantity: 8 }],
+        },
+        {
+          _id: 'demo-prod-low-02',
+          name: 'Hydraulic Pressure Valve',
+          sku: 'VLV-HYD-50',
+          category: 'Raw Materials',
+          totalQuantity: 3,
+          minReorderLevel: 10,
+          unitOfMeasure: 'Units',
+          costPrice: 85.0,
+          sellingPrice: 140.0,
+          warehouseStock: [{ warehouse: { name: 'North Distribution Hub', code: 'WH-NORTH' }, quantity: 3 }],
+        },
+      ];
+    }
+    return await Product.find({
+      isActive: true,
+      $expr: { $lte: ['$totalQuantity', '$minReorderLevel'] },
+    })
+      .populate('warehouseStock.warehouse', 'name code')
+      .sort({ totalQuantity: 1 });
+  }
+
+  static async getPendingReceipts(limit = 20) {
+    const { isDbConnected } = require('../config/db');
+    if (!isDbConnected()) {
+      return [
+        {
+          _id: 'demo-rec-pending-01',
+          receiptNumber: 'REC-2026-091',
+          supplier: { name: 'Apex Metal Supplies', contact: '+1-555-0199' },
+          warehouse: { name: 'Main Central Warehouse', code: 'WH-MAIN' },
+          status: 'ready',
+          items: [{ product: { name: 'Industrial Electric Motor 5HP', sku: 'MOT-5HP-01' }, orderedQty: 20, unitCost: 150 }],
+          totalAmount: 3000,
+          scheduledDate: new Date(),
+        },
+      ];
+    }
+    return await Receipt.find({
+      status: { $in: ['draft', 'waiting', 'ready'] },
+    })
+      .populate('warehouse', 'name code location')
+      .populate('items.product', 'name sku unitOfMeasure')
+      .sort({ scheduledDate: 1, createdAt: -1 })
+      .limit(Number(limit));
+  }
+
+  static async getPendingDeliveries(limit = 20) {
+    const { isDbConnected } = require('../config/db');
+    if (!isDbConnected()) {
+      return [
+        {
+          _id: 'demo-del-pending-01',
+          deliveryNumber: 'DEL-2026-042',
+          customer: { name: 'Global Manufacturing Ltd' },
+          warehouse: { name: 'North Distribution Hub', code: 'WH-NORTH' },
+          status: 'waiting',
+          items: [{ product: { name: 'PLC Automation Board V2', sku: 'PLC-V2-88' }, demandedQty: 10, unitPrice: 320 }],
+          totalAmount: 3200,
+          scheduledDate: new Date(),
+        },
+      ];
+    }
+    return await Delivery.find({
+      status: { $in: ['draft', 'waiting', 'ready'] },
+    })
+      .populate('warehouse', 'name code location')
+      .populate('items.product', 'name sku unitOfMeasure')
+      .sort({ scheduledDate: 1, createdAt: -1 })
+      .limit(Number(limit));
+  }
+
+  static async getDashboardTransfers(limit = 20) {
+    const { isDbConnected } = require('../config/db');
+    if (!isDbConnected()) {
+      return [
+        {
+          _id: 'demo-trf-active-01',
+          transferNumber: 'TRF-2026-019',
+          fromWarehouse: { name: 'Main Central Warehouse', code: 'WH-MAIN' },
+          toWarehouse: { name: 'West Regional Depot', code: 'WH-WEST' },
+          status: 'in-transit',
+          items: [{ product: { name: 'Copper Wire Spool 100M', sku: 'RAW-002' }, quantity: 15 }],
+          scheduledDate: new Date(),
+        },
+      ];
+    }
+    return await Transfer.find({
+      status: { $in: ['draft', 'waiting', 'ready', 'in-transit'] },
+    })
+      .populate('fromWarehouse', 'name code location')
+      .populate('toWarehouse', 'name code location')
+      .populate('items.product', 'name sku unitOfMeasure')
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+  }
 }
 
 module.exports = DashboardService;
+
