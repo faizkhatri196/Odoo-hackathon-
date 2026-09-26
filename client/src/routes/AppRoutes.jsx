@@ -32,6 +32,8 @@ import { AdjustmentForm } from '../pages/adjustments/AdjustmentForm';
 
 import { StockLedger } from '../pages/ledger/StockLedger';
 import { LedgerDetails } from '../pages/ledger/LedgerDetails';
+import { WarehouseSettings } from '../pages/settings/WarehouseSettings';
+import { Profile } from '../pages/profile/Profile';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -87,6 +89,13 @@ export const AppRoutes = () => {
         {/* Ledger */}
         <Route path="ledger" element={<StockLedger />} />
         <Route path="ledger/:id" element={<LedgerDetails />} />
+
+        {/* Settings */}
+        <Route path="settings/warehouse" element={<WarehouseSettings />} />
+        <Route path="warehouses" element={<WarehouseSettings />} />
+
+        {/* Profile */}
+        <Route path="profile" element={<Profile />} />
       </Route>
 
       {/* Catch-all fallback */}
